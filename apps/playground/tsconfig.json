@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "paths": {
+      "@local/rich-editor": ["../../packages/editor/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../../packages/editor/src/**/*.ts", "../../packages/editor/src/**/*.vue"]
+}

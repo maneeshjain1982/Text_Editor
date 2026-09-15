@@ -1,0 +1,18 @@
+{
+  "name": "rich-editor-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w playground",
+    "build": "npm run build -w @local/rich-editor",
+    "build:playground": "npm run build -w playground",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "pack": "npm pack -w @local/rich-editor --pack-destination packages/editor"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,79 @@
+/*
+ * Design tokens. Override any --re-* variable on .re-root (or an ancestor)
+ * to match the host dashboard, e.g.
+ *   .my-dashboard .re-root, .re-portal { --re-primary: #6d28d9; --re-radius: 4px; }
+ */
+.re-root,
+.re-portal,
+.re-export {
+  /* content — keep in sync with DOCX export defaults */
+  --re-font: Calibri, Carlito, 'Segoe UI', Arial, sans-serif;
+  --re-font-mono: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  --re-font-size: 11pt;
+  --re-line-height: 1.5;
+
+  /* chrome */
+  --re-ui-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --re-ui-font-size: 13px;
+
+  --re-primary: #2563eb;
+  --re-primary-hover: #1d4ed8;
+  --re-primary-soft: rgba(37, 99, 235, 0.1);
+  --re-on-primary: #ffffff;
+  --re-danger: #dc2626;
+  --re-danger-soft: rgba(220, 38, 38, 0.08);
+
+  --re-bg: #ffffff;
+  --re-toolbar-bg: #ffffff;
+  --re-canvas: #eef0f3;
+  --re-surface-raised: #ffffff;
+  --re-hover: #f1f3f5;
+  --re-text: #1f2328;
+  --re-text-strong: #0f1419;
+  --re-muted: #6b7280;
+  --re-border: #d8dde3;
+  --re-border-subtle: #e8ebef;
+  --re-code-bg: #f3f4f6;
+  --re-selection: rgba(37, 99, 235, 0.18);
+  --re-match: rgba(250, 204, 21, 0.45);
+  --re-match-current: rgba(249, 115, 22, 0.55);
+  --re-shadow: 0 1px 2px rgba(15, 20, 25, 0.06), 0 8px 24px rgba(15, 20, 25, 0.12);
+  --re-page-shadow: 0 1px 3px rgba(15, 20, 25, 0.1), 0 0 0 1px rgba(15, 20, 25, 0.04);
+
+  --re-radius: 8px;
+  --re-radius-sm: 6px;
+  --re-page-width: 210mm; /* A4 */
+  --re-page-height: 297mm;
+  --re-page-padding: 25.4mm; /* 1in margins — matches DOCX export */
+}
+
+.re-root.re-page-letter {
+  --re-page-width: 8.5in;
+  --re-page-height: 11in;
+}
+
+.re-theme-dark {
+  --re-primary: #60a5fa;
+  --re-primary-hover: #93c5fd;
+  --re-primary-soft: rgba(96, 165, 250, 0.16);
+  --re-on-primary: #0b1220;
+  --re-danger: #f87171;
+  --re-danger-soft: rgba(248, 113, 113, 0.12);
+
+  --re-bg: #1b1f24;
+  --re-toolbar-bg: #1b1f24;
+  --re-canvas: #111418;
+  --re-surface-raised: #22272e;
+  --re-hover: #2a3038;
+  --re-text: #e6e8eb;
+  --re-text-strong: #f5f6f7;
+  --re-muted: #9aa3ad;
+  --re-border: #353b43;
+  --re-border-subtle: #2b3038;
+  --re-code-bg: #262c33;
+  --re-selection: rgba(96, 165, 250, 0.3);
+  --re-match: rgba(250, 204, 21, 0.3);
+  --re-match-current: rgba(249, 115, 22, 0.5);
+  --re-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --re-page-shadow: 0 0 0 1px #2b3038, 0 2px 8px rgba(0, 0, 0, 0.4);
+}

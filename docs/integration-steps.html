@@ -1,0 +1,653 @@
+<title>Rich Editor Integration</title>
+<meta name="description" content="Step-by-step guide to adding @local/rich-editor to an existing Vue 3 front end.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --ink: #151a22;
+    --muted: #5a6474;
+    --line: #dce1e8;
+    --accent: #2563eb;
+    --accent-soft: #e6eefd;
+    --code-bg: #111827;
+    --code-ink: #e5e9f0;
+    --code-muted: #8b95a7;
+    --code-key: #93c5fd;
+    --code-str: #a7f3d0;
+    --ok: #15803d;
+    --warn: #b45309;
+    --warn-soft: #fef3e2;
+
+    --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116;
+      --surface: #161b22;
+      --ink: #e7eaf0;
+      --muted: #9aa4b2;
+      --line: #2a313b;
+      --accent: #6ea1ff;
+      --accent-soft: #1b2740;
+      --code-bg: #0a0d12;
+      --ok: #4ade80;
+      --warn: #f5b458;
+      --warn-soft: #2b2112;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116;
+    --surface: #161b22;
+    --ink: #e7eaf0;
+    --muted: #9aa4b2;
+    --line: #2a313b;
+    --accent: #6ea1ff;
+    --accent-soft: #1b2740;
+    --code-bg: #0a0d12;
+    --ok: #4ade80;
+    --warn: #f5b458;
+    --warn-soft: #2b2112;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    padding-inline: 20px;
+    padding-block: 0 64px;
+  }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header.intro {
+    padding-block: 48px 32px;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 14px;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-size: clamp(34px, 5vw, 50px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .lede { margin: 0; max-width: 64ch; color: var(--muted); font-size: 18px; }
+  .reqs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .req {
+    font-size: 13.5px;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+  .req b { font-weight: 600; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 48px;
+    padding-top: 36px;
+  }
+  nav.toc {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 24px);
+    align-self: start;
+    font-size: 14px;
+  }
+  nav.toc p {
+    margin: 0 0 10px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    padding: 5px 8px;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  nav.toc a::before { content: counter(toc); font-family: var(--font-mono); font-size: 12.5px; padding-top: 1px; }
+  nav.toc a:hover { color: var(--ink); background: var(--surface); }
+  nav.toc a.opt::after { content: ''; }
+
+  main { display: grid; gap: 20px; min-width: 0; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 18px;
+    padding-block: 22px;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: 16px;
+  }
+  .step:first-child { border-top: 0; padding-top: 0; }
+  .num {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 19px;
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .step-body { display: grid; gap: 12px; min-width: 0; }
+  h2 {
+    font-family: var(--font-display);
+    font-size: 24px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 8px 0 0;
+    text-wrap: balance;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .tag {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .where {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .step p { margin: 0; max-width: 68ch; }
+  .step ul { margin: 0; padding-left: 20px; max-width: 68ch; }
+  code:not(pre code) {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--accent-soft);
+  }
+
+  .code {
+    position: relative;
+    background: var(--code-bg);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .code-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 8px 7px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--code-muted);
+  }
+  .copy {
+    font: 500 12px var(--font-body);
+    color: var(--code-ink);
+    background: rgba(255, 255, 255, 0.08);
+    border: 0;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .copy:hover { background: rgba(255, 255, 255, 0.16); }
+  pre {
+    margin: 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--code-ink);
+  }
+  pre .c { color: var(--code-muted); }
+  pre .k { color: var(--code-key); }
+  pre .s { color: var(--code-str); }
+
+  .check {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    font-size: 14.5px;
+    color: var(--muted);
+  }
+  .check::before { content: '✓'; color: var(--ok); font-weight: 600; }
+
+  .note {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--warn-soft);
+    font-size: 14.5px;
+    max-width: 68ch;
+  }
+  .note strong { color: var(--warn); }
+
+  section.panel {
+    margin-top: 12px;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: grid;
+    gap: 14px;
+    scroll-margin-top: 16px;
+  }
+  section.panel h2 { margin: 0; }
+  .progress { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .checklist label {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .checklist label:hover { background: var(--bg); }
+  .checklist input { margin-top: 5px; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+  .checklist input:checked + span { color: var(--muted); text-decoration: line-through; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 560px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  td:first-child { width: 40%; font-weight: 500; }
+
+  footer { margin-top: 36px; font-size: 14px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 16px; }
+    nav.toc { position: static; }
+    nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  }
+  @media (max-width: 520px) {
+    .step { grid-template-columns: 1fr; gap: 10px; }
+    .num { width: 36px; height: 36px; font-size: 16px; }
+    h2 { font-size: 21px; }
+    section.panel { padding: 18px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div class="eyebrow">@local/rich-editor · v0.1.0</div>
+    <h1>Integrating the Rich Editor into your front end</h1>
+    <p class="lede">Twelve steps, from building the package to a release check. Each step says where the code goes and how to confirm it worked.</p>
+    <div class="reqs" aria-label="Requirements">
+      <span class="req"><b>Vue</b> 3.3 or later</span>
+      <span class="req"><b>Bundler</b> Vite or webpack 5</span>
+      <span class="req"><b>TypeScript</b> moduleResolution “bundler” or “node”</span>
+      <span class="req"><b>Node</b> 20.19+ to build the package</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Steps">
+      <p>Steps</p>
+      <ol>
+        <li><a href="#s1">Check requirements</a></li>
+        <li><a href="#s2">Build the package</a></li>
+        <li><a href="#s3">Install in your app</a></li>
+        <li><a href="#s4">Import the styles</a></li>
+        <li><a href="#s5">Add the editor</a></li>
+        <li><a href="#s6">Load and save</a></li>
+        <li><a href="#s7">Image uploads</a></li>
+        <li><a href="#s8">Match your design</a></li>
+        <li><a href="#s9">Configure the page</a></li>
+        <li><a href="#s10">Word export</a></li>
+        <li><a href="#s11">Secure the content</a></li>
+        <li><a href="#s12">Test before release</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <article class="step" id="s1">
+        <div class="num" aria-hidden="true">1</div>
+        <div class="step-body">
+          <h2>Check requirements</h2>
+          <p>Run this in your front-end project to confirm the Vue version. Vue 2 and Vue CLI 4 (webpack 4) are not supported.</p>
+          <div class="code">
+            <div class="code-head"><span>terminal · your app</span><button class="copy" type="button">Copy</button></div>
+<pre>npm ls vue</pre>
+          </div>
+          <div class="check">The output shows vue@3.3 or later.</div>
+        </div>
+      </article>
+
+      <article class="step" id="s2">
+        <div class="num" aria-hidden="true">2</div>
+        <div class="step-body">
+          <h2>Build the package</h2>
+          <div class="where">in the editor repository — E:\Samsung\Editor</div>
+          <div class="code">
+            <div class="code-head"><span>terminal · editor repo</span><button class="copy" type="button">Copy</button></div>
+<pre>npm install
+npm run build
+npm run pack</pre>
+          </div>
+          <div class="check">The file <code>packages/editor/local-rich-editor-0.1.0.tgz</code> exists.</div>
+        </div>
+      </article>
+
+      <article class="step" id="s3">
+        <div class="num" aria-hidden="true">3</div>
+        <div class="step-body">
+          <h2>Install it in your app</h2>
+          <p>Copy the <code>.tgz</code> into your project (for example a <code>vendor/</code> folder) and install it. The path in <code>package.json</code> then works for every developer and in CI.</p>
+          <div class="code">
+            <div class="code-head"><span>terminal · your app</span><button class="copy" type="button">Copy</button></div>
+<pre>npm install ./vendor/local-rich-editor-0.1.0.tgz
+npm ls vue</pre>
+          </div>
+          <div class="check">Only one copy of <code>vue</code> is listed; the editor’s copy is marked “deduped”.</div>
+          <p class="note"><strong>Seeing two copies of Vue?</strong> Add <code>resolve: { dedupe: ['vue'] }</code> to <code>vite.config.ts</code>, delete <code>node_modules/.vite</code>, and restart the dev server.</p>
+        </div>
+      </article>
+
+      <article class="step" id="s4">
+        <div class="num" aria-hidden="true">4</div>
+        <div class="step-body">
+          <h2>Import the styles once</h2>
+          <div class="where">src/main.ts</div>
+          <div class="code">
+            <div class="code-head"><span>main.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">import</span> <span class="s">'@local/rich-editor/styles.css'</span></pre>
+          </div>
+          <p>All editor class names start with <code>re-</code> and the stylesheet sets no global styles, so it won’t change the rest of your dashboard.</p>
+        </div>
+      </article>
+
+      <article class="step" id="s5">
+        <div class="num" aria-hidden="true">5</div>
+        <div class="step-body">
+          <h2>Add the editor to a page</h2>
+          <div class="where">any .vue page, e.g. src/views/DocumentEdit.vue</div>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue</span><button class="copy" type="button">Copy</button></div>
+<pre>&lt;script setup lang="ts"&gt;
+<span class="k">import</span> { ref } <span class="k">from</span> <span class="s">'vue'</span>
+<span class="k">import</span> { RichEditor } <span class="k">from</span> <span class="s">'@local/rich-editor'</span>
+
+<span class="k">const</span> content = ref(<span class="s">''</span>)
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;div style="height: 80vh"&gt;
+    &lt;RichEditor v-model="content" layout="document" height="100%" /&gt;
+  &lt;/div&gt;
+&lt;/template&gt;</pre>
+          </div>
+          <p>The editor fills the space it’s given. Give the container a height, or use <code>:height="400"</code> for a fixed size or <code>height="auto"</code> to grow with the content.</p>
+          <div class="check">The toolbar appears and you can type, format text and insert a table.</div>
+        </div>
+      </article>
+
+      <article class="step" id="s6">
+        <div class="num" aria-hidden="true">6</div>
+        <div class="step-body">
+          <h2>Load and save content through your API</h2>
+          <p>Render the editor only after the document has loaded. Store HTML (the default), or add <code>content-format="json"</code> to store JSON.</p>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue · script</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">const</span> loading = ref(<span class="k">true</span>)
+<span class="k">const</span> savedContent = ref(<span class="s">''</span>)
+
+onMounted(<span class="k">async</span> () =&gt; {
+  content.value = (<span class="k">await</span> api.get(<span class="s">`/documents/${id}`</span>)).html
+  loading.value = <span class="k">false</span>
+})
+
+<span class="c">// The editor normalises HTML on load; use its first output as the saved state.</span>
+<span class="k">function</span> onReady(editorApi: RichEditorExpose) {
+  savedContent.value = editorApi.getHTML()
+}
+
+<span class="k">async function</span> save() {
+  <span class="k">await</span> api.put(<span class="s">`/documents/${id}`</span>, { html: content.value })
+  savedContent.value = content.value
+}</pre>
+          </div>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue · template</span><button class="copy" type="button">Copy</button></div>
+<pre>&lt;RichEditor v-if="!loading" v-model="content" @ready="onReady" /&gt;
+&lt;button :disabled="content === savedContent" @click="save"&gt;Save&lt;/button&gt;</pre>
+          </div>
+          <div class="check">Save, reload the page, and the content comes back unchanged.</div>
+        </div>
+      </article>
+
+      <article class="step" id="s7">
+        <div class="num" aria-hidden="true">7</div>
+        <div class="step-body">
+          <h2>Connect image uploads to your backend</h2>
+          <p>Without this, images are embedded in the content as base64, which makes every save large. Your function uploads the file and returns its URL.</p>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">async function</span> uploadImage(file: File) {
+  <span class="k">const</span> form = <span class="k">new</span> FormData()
+  form.append(<span class="s">'file'</span>, file)
+  <span class="k">const</span> res = <span class="k">await</span> fetch(<span class="s">'/api/uploads/images'</span>, { method: <span class="s">'POST'</span>, body: form })
+  <span class="k">if</span> (!res.ok) <span class="k">throw new</span> Error(<span class="s">'Upload failed'</span>)
+  <span class="k">return</span> (<span class="k">await</span> res.json()).url
+}
+
+<span class="c">// template</span>
+&lt;RichEditor v-model="content" :upload-image="uploadImage" @error="onError" /&gt;</pre>
+          </div>
+          <ul>
+            <li>A preview shows immediately and is replaced by your URL when the upload finishes. If it fails, the image is removed and <code>error</code> fires.</li>
+            <li>Allow your app’s origin in CORS on the image host; Word export downloads each image to embed it.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="step" id="s8">
+        <div class="num" aria-hidden="true">8</div>
+        <div class="step-body">
+          <h2>Match your dashboard’s look</h2>
+          <div class="where">a global stylesheet loaded after the editor styles</div>
+          <div class="code">
+            <div class="code-head"><span>editor-theme.css</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="c">/* .re-portal covers dropdowns and dialogs, which render in &lt;body&gt; */</span>
+.re-root,
+.re-portal {
+  --re-primary: <span class="s">#2563eb</span>;
+  --re-primary-hover: <span class="s">#1d4ed8</span>;
+  --re-primary-soft: <span class="s">rgba(37, 99, 235, 0.1)</span>;
+  --re-ui-font: <span class="s">'Inter', sans-serif</span>;
+  --re-radius: <span class="s">6px</span>;
+}</pre>
+          </div>
+          <p>Follow your dark mode by passing <code>:theme="isDark ? 'dark' : 'light'"</code>, or use <code>theme="auto"</code> to follow the operating system.</p>
+        </div>
+      </article>
+
+      <article class="step" id="s9">
+        <div class="num" aria-hidden="true">9</div>
+        <div class="step-body">
+          <h2>Configure it for the page</h2>
+          <div class="code">
+            <div class="code-head"><span>template</span><button class="copy" type="button">Copy</button></div>
+<pre>&lt;RichEditor
+  v-model="content"
+  toolbar="basic"
+  :editable="canEdit"
+  :features="{ images: true, tables: true, docx: true }"
+  page-size="A4"
+  document-name="report"
+/&gt;</pre>
+          </div>
+          <ul>
+            <li><code>toolbar</code>: <code>'full'</code>, <code>'basic'</code>, <code>'none'</code>, or your own groups such as <code>[['bold','italic'], ['table']]</code>.</li>
+            <li><code>editable</code>: set to <code>false</code> for read-only; the toolbar hides.</li>
+            <li><code>features</code> is read when the editor mounts. Change the component’s <code>:key</code> to apply new values.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="step" id="s10">
+        <div class="num" aria-hidden="true">10</div>
+        <div class="step-body">
+          <h2>Add Word export where you need it <span class="tag">optional</span></h2>
+          <p>The toolbar’s <b>File</b> menu already opens and downloads .docx. To use your own buttons, call the editor through a template ref.</p>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">const</span> editorRef = ref&lt;RichEditorExpose&gt;()
+
+<span class="c">// download to the user's computer</span>
+editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report'</span>)
+
+<span class="c">// or get the file and send it to your server</span>
+<span class="k">const</span> blob = <span class="k">await</span> editorRef.value!.exportDocx()
+
+<span class="c">// template</span>
+&lt;RichEditor ref="editorRef" v-model="content" layout="document" /&gt;</pre>
+          </div>
+          <p>For list pages that export without showing the editor, use <code>import { exportDocx } from '@local/rich-editor/docx'</code> with JSON content.</p>
+        </div>
+      </article>
+
+      <article class="step" id="s11">
+        <div class="num" aria-hidden="true">11</div>
+        <div class="step-body">
+          <h2>Secure the content</h2>
+          <p>The editor strips unknown markup, but your API can still receive anything a user sends.</p>
+          <ul>
+            <li><b>When saving:</b> sanitise HTML on the server with an allow-list sanitiser (DOMPurify, bleach, HtmlSanitizer or OWASP).</li>
+            <li><b>When displaying outside the editor:</b> sanitise before <code>v-html</code>.</li>
+            <li><b>Uploads:</b> check file type and size on the server, and sanitise or reject SVG files.</li>
+          </ul>
+          <div class="code">
+            <div class="code-head"><span>display page</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">import</span> DOMPurify <span class="k">from</span> <span class="s">'dompurify'</span>
+<span class="k">const</span> safeHtml = computed(() =&gt; DOMPurify.sanitize(doc.value.html))
+
+<span class="c">// template: the editor's content styles, without the editor</span>
+&lt;article class="re-export re-content" v-html="safeHtml" /&gt;</pre>
+          </div>
+        </div>
+      </article>
+
+      <article class="step" id="s12">
+        <div class="num" aria-hidden="true">12</div>
+        <div class="step-body">
+          <h2>Test before release</h2>
+          <p>Work through the checklist below on a real page of your app. Your ticks are kept in this browser.</p>
+        </div>
+      </article>
+
+      <section class="panel" id="checklist" aria-labelledby="checklist-title">
+        <h2 id="checklist-title">Release checklist</h2>
+        <div class="progress" id="progress" aria-live="polite">0 of 8 done</div>
+        <ul class="checklist">
+          <li><label><input type="checkbox" id="c1"><span>The editor shows its styles, toolbar and a scrollbar</span></label></li>
+          <li><label><input type="checkbox" id="c2"><span>Content saves and reloads unchanged</span></label></li>
+          <li><label><input type="checkbox" id="c3"><span>“Unsaved changes” doesn’t appear straight after loading</span></label></li>
+          <li><label><input type="checkbox" id="c4"><span>Image upload works, and the server rejects wrong types and sizes</span></label></li>
+          <li><label><input type="checkbox" id="c5"><span>Dropdowns and dialogs appear above your header and modals</span></label></li>
+          <li><label><input type="checkbox" id="c6"><span>Brand colors and dark mode apply, including in dropdowns</span></label></li>
+          <li><label><input type="checkbox" id="c7"><span>An exported .docx opens correctly in Word, with images</span></label></li>
+          <li><label><input type="checkbox" id="c8"><span>The page works at your smallest supported screen width</span></label></li>
+        </ul>
+      </section>
+
+      <section class="panel" id="troubleshooting" aria-labelledby="trouble-title">
+        <h2 id="trouble-title">If something doesn’t work</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Symptom</th><th scope="col">Fix</th></tr></thead>
+            <tbody>
+              <tr><td>No styles, broken toolbar layout</td><td>Import <code>@local/rich-editor/styles.css</code> in <code>main.ts</code> (step 4).</td></tr>
+              <tr><td>Editor collapsed or no scrollbar</td><td>Give its container a height, or use <code>height="auto"</code> (step 5).</td></tr>
+              <tr><td>“Invalid VNode type” or <code>inject()</code> warnings</td><td>Two copies of Vue. Add <code>resolve: { dedupe: ['vue'] }</code> and clear <code>node_modules/.vite</code>.</td></tr>
+              <tr><td>Can’t find <code>@local/rich-editor/docx</code> types</td><td>Set <code>moduleResolution</code> to <code>"bundler"</code> or <code>"node"</code>.</td></tr>
+              <tr><td>Dropdowns hidden behind your header or modal</td><td>Lower the editor’s layers: <code>.re-popover { z-index: 3000 }</code>, <code>.re-modal-backdrop { z-index: 3100 }</code>.</td></tr>
+              <tr><td>Brand colors missing in dropdowns</td><td>Add <code>.re-portal</code> to your variable selector (step 8).</td></tr>
+              <tr><td>Images missing from the Word file</td><td>The image host blocks CORS. Allow your app’s origin (step 7).</td></tr>
+              <tr><td>First Word export reloads the page in development</td><td>Add <code>optimizeDeps: { include: ['docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'] }</code> to <code>vite.config.ts</code>.</td></tr>
+              <tr><td>Changing <code>features</code> does nothing</td><td>Change the component’s <code>:key</code> to remount it.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        Full details: <code>docs/INTEGRATION.md</code> · Props, events and methods: <code>packages/editor/README.md</code>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  // Copy buttons
+  document.querySelectorAll('.copy').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const text = button.closest('.code').querySelector('pre').innerText
+      let ok = false
+      try {
+        await navigator.clipboard.writeText(text)
+        ok = true
+      } catch (e) {
+        const range = document.createRange()
+        range.selectNodeContents(button.closest('.code').querySelector('pre'))
+        const sel = getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+      button.textContent = ok ? 'Copied' : 'Selected — press Ctrl+C'
+      setTimeout(() => (button.textContent = 'Copy'), 1800)
+    })
+  })
+
+  // Checklist progress, remembered per viewer
+  const KEY = 'rich-editor-integration-checklist'
+  const boxes = Array.from(document.querySelectorAll('.checklist input'))
+  const progress = document.getElementById('progress')
+  let saved = {}
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') } catch (e) { saved = {} }
+  const render = () => {
+    const done = boxes.filter((b) => b.checked).length
+    progress.textContent = `${done} of ${boxes.length} done`
+  }
+  boxes.forEach((box) => {
+    box.checked = !!saved[box.id]
+    box.addEventListener('change', () => {
+      saved[box.id] = box.checked
+      try { localStorage.setItem(KEY, JSON.stringify(saved)) } catch (e) {}
+      render()
+    })
+  })
+  render()
+</script>

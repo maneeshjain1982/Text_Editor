@@ -1,0 +1,81 @@
+{
+  "name": "@local/rich-editor",
+  "version": "0.1.0",
+  "description": "Rich text editor for Vue 3 with tables, images and DOCX export",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/rich-editor.cjs",
+  "module": "./dist/rich-editor.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "docx": [
+        "./dist/docx.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/rich-editor.js",
+      "require": "./dist/rich-editor.cjs"
+    },
+    "./docx": {
+      "types": "./dist/docx.d.ts",
+      "import": "./dist/docx.js",
+      "require": "./dist/docx.cjs"
+    },
+    "./styles.css": "./dist/rich-editor.css"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.0",
+    "@types/turndown": "^5.0.6",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "happy-dom": "^20.14.5",
+    "jszip": "^3.10.2",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.0",
+    "vite-plugin-dts": "^5.1.0",
+    "vitest": "^5.0.1",
+    "vue": "^3.5.42",
+    "vue-tsc": "^3.3.11"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/extension-code-block-lowlight": "^3.31.3",
+    "@tiptap/extension-highlight": "^3.31.3",
+    "@tiptap/extension-list": "^3.31.3",
+    "@tiptap/extension-subscript": "^3.31.3",
+    "@tiptap/extension-superscript": "^3.31.3",
+    "@tiptap/extension-table": "^3.31.3",
+    "@tiptap/extension-text-align": "^3.31.3",
+    "@tiptap/extension-text-style": "^3.31.3",
+    "@tiptap/extensions": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "@tiptap/vue-3": "^3.31.3",
+    "docx": "^9.7.1",
+    "highlight.js": "^11.12.0",
+    "lowlight": "^3.3.0",
+    "lucide-vue-next": "^1.0.0",
+    "mammoth": "^1.12.3",
+    "marked": "^18.0.13",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}

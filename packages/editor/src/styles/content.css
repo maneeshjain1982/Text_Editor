@@ -1,0 +1,275 @@
+/*
+ * Document content. Sizes and spacing mirror services/docx/exportDocx.ts so a
+ * downloaded .docx looks like the editor. This file is also inlined (with
+ * .re-content → .re-export) into exported HTML and print output.
+ */
+.re-content {
+  font-family: var(--re-font);
+  font-size: var(--re-font-size);
+  line-height: var(--re-line-height);
+  color: var(--re-text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  outline: none;
+  tab-size: 4;
+}
+
+.re-content::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+.re-content p {
+  margin: 0 0 0.6em;
+}
+
+.re-content h1,
+.re-content h2,
+.re-content h3,
+.re-content h4,
+.re-content h5,
+.re-content h6 {
+  margin: 1em 0 0.4em;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--re-text);
+}
+
+.re-content > :first-child {
+  margin-top: 0;
+}
+
+.re-content h1 { font-size: 2em; }
+.re-content h2 { font-size: 1.6em; }
+.re-content h3 { font-size: 1.3em; }
+.re-content h4 { font-size: 1.1em; }
+.re-content h5 { font-size: 1em; }
+.re-content h6 { font-size: 0.9em; color: var(--re-muted); }
+
+.re-content a {
+  color: var(--re-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.re-content mark {
+  background-color: #fef08a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.re-content code {
+  font-family: var(--re-font-mono);
+  font-size: 0.9em;
+  background: var(--re-code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+}
+
+.re-content pre {
+  font-family: var(--re-font-mono);
+  font-size: 0.9em;
+  line-height: 1.35;
+  background: var(--re-code-bg);
+  color: var(--re-text);
+  margin: 0.4em 0 0.8em;
+  padding: 10px 12px;
+  border-radius: var(--re-radius-sm, 6px);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.re-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
+.re-content blockquote {
+  margin: 0.6em 0 0.8em;
+  padding-left: 1em;
+  border-left: 3px solid var(--re-border);
+  color: var(--re-muted);
+}
+
+.re-content blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.re-content hr {
+  border: none;
+  border-top: 1px solid var(--re-border);
+  margin: 1.1em 0;
+}
+
+/* Lists — 24px per level = 360 twips in Word */
+.re-content ul,
+.re-content ol {
+  margin: 0 0 0.6em;
+  padding-left: 24px;
+}
+
+.re-content ul { list-style: disc; }
+.re-content ul ul { list-style: circle; }
+.re-content ul ul ul { list-style: square; }
+.re-content ol { list-style: decimal; }
+.re-content ol ol { list-style: lower-alpha; }
+.re-content ol ol ol { list-style: lower-roman; }
+
+.re-content li {
+  margin: 0 0 0.18em;
+}
+
+.re-content li > p {
+  margin: 0;
+}
+
+.re-content li > ul,
+.re-content li > ol {
+  margin: 0.18em 0 0;
+}
+
+.re-content ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.re-content ul[data-type='taskList'] ul[data-type='taskList'] {
+  padding-left: 24px;
+}
+
+.re-content li[data-type='taskItem'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.re-content li[data-type='taskItem'] > label {
+  flex: 0 0 auto;
+  user-select: none;
+  line-height: inherit;
+}
+
+.re-content li[data-type='taskItem'] > label input {
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  vertical-align: -0.15em;
+  accent-color: var(--re-primary);
+  cursor: pointer;
+}
+
+.re-content li[data-type='taskItem'] > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.re-content li[data-type='taskItem'][data-checked='true'] > div {
+  color: var(--re-muted);
+  text-decoration: line-through;
+}
+
+/* Tables */
+.re-content table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0.4em 0 0.8em;
+  overflow: hidden;
+}
+
+.re-content th,
+.re-content td {
+  position: relative;
+  min-width: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--re-border);
+  vertical-align: top;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.re-content th {
+  font-weight: 700;
+  background-color: var(--re-code-bg);
+}
+
+.re-content th > p,
+.re-content td > p {
+  margin: 0;
+}
+
+.re-content th > * + *,
+.re-content td > * + * {
+  margin-top: 0.4em;
+}
+
+/* Images (static HTML — the editor uses ImageView.vue with the same classes) */
+.re-content figure[data-type='image'] {
+  max-width: 100%;
+  margin: 0.6em auto;
+}
+
+.re-content figure[data-type='image'] img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.re-content figcaption {
+  text-align: center;
+  font-size: 0.9em;
+  color: var(--re-muted);
+  margin-top: 0.3em;
+}
+
+/* Syntax highlighting — GitHub palette, matches TOKEN_COLORS in extensions/lowlight.ts */
+.re-content .hljs-keyword,
+.re-content .hljs-selector-tag,
+.re-content .hljs-type,
+.re-content .hljs-template-tag,
+.re-content .hljs-doctag { color: #cf222e; }
+.re-content .hljs-string,
+.re-content .hljs-regexp,
+.re-content .hljs-selector-attr,
+.re-content .hljs-selector-pseudo { color: #0a3069; }
+.re-content .hljs-number,
+.re-content .hljs-literal,
+.re-content .hljs-built_in,
+.re-content .hljs-attr,
+.re-content .hljs-attribute,
+.re-content .hljs-section,
+.re-content .hljs-symbol,
+.re-content .hljs-property { color: #0550ae; }
+.re-content .hljs-variable,
+.re-content .hljs-bullet,
+.re-content .hljs-title.class_ { color: #953800; }
+.re-content .hljs-title,
+.re-content .hljs-title.function_ { color: #8250df; }
+.re-content .hljs-selector-class,
+.re-content .hljs-selector-id { color: #6639ba; }
+.re-content .hljs-comment,
+.re-content .hljs-quote,
+.re-content .hljs-meta { color: #6e7781; font-style: italic; }
+.re-content .hljs-name,
+.re-content .hljs-selector-name,
+.re-content .hljs-tag,
+.re-content .hljs-addition { color: #116329; }
+.re-content .hljs-deletion { color: #82071e; }
+
+@media print {
+  .re-content pre,
+  .re-content table,
+  .re-content figure {
+    break-inside: avoid;
+  }
+  .re-content h1,
+  .re-content h2,
+  .re-content h3 {
+    break-after: avoid;
+  }
+}
