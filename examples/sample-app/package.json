@@ -1,0 +1,26 @@
+{
+  "name": "rich-editor-sample-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sample Vue 3 app that consumes @local/rich-editor from its packed tarball, exactly like a real dashboard would.",
+  "type": "module",
+  "scripts": {
+    "editor:pack": "npm --prefix ../.. run build && npm --prefix ../.. run pack",
+    "editor:update": "npm run editor:pack && npm install @local/rich-editor@file:../../packages/editor/local-rich-editor-0.1.0.tgz",
+    "dev": "vite",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort"
+  },
+  "dependencies": {
+    "@local/rich-editor": "file:../../packages/editor/local-rich-editor-0.1.0.tgz",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
+  }
+}

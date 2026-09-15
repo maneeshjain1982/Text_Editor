@@ -14,6 +14,7 @@ A rich text editor for **Vue 3**, shipped as a local npm package (`@local/rich-e
 
 - **[Integration guide](docs/INTEGRATION.md)**: step-by-step instructions for adding the editor to an existing front end
 - **[API reference](packages/editor/README.md)**: every prop, event, method, slot, CSS variable and toolbar item
+- **[Sample app](examples/sample-app/README.md)**: a working Vue app that installs the editor as a package; how to run it and how each integration step is implemented
 - **[Plan](PLAN.md)**: design decisions and scope
 
 ---
@@ -77,7 +78,10 @@ Editor/
 │  ├─ test/                    Vitest unit tests
 │  └─ README.md                API reference
 ├─ apps/playground/            demo dashboard used for development and end-to-end tests
-├─ e2e/                        Playwright end-to-end tests
+├─ e2e/                        Playwright end-to-end tests (playground)
+├─ examples/
+│  ├─ sample-app/              Vue 3 app that installs the editor from its .tgz, like a real consumer
+│  └─ sample-app-tests/        separate test project: package checks + browser tests of the sample app's production build
 ├─ docs/INTEGRATION.md         integration guide
 └─ PLAN.md
 ```
@@ -94,6 +98,7 @@ Run these from the repository root.
 | `npm run typecheck` | Runs `vue-tsc` on the package and the playground |
 | `npm run test -w @local/rich-editor` | Runs the unit tests (Vitest): Word export XML and round trip, search, schema, exporters, importers |
 | `npx playwright test` | Runs the end-to-end tests in the installed Microsoft Edge. Set `PW_CHANNEL=chrome` to use Chrome. |
+| `npm run validate --prefix examples/sample-app-tests` | Rebuilds and packs the editor, installs it in the sample app, then runs the package checks and browser tests. See [examples/README.md](examples/README.md). |
 
 ## Build output
 
@@ -108,7 +113,7 @@ Run these from the repository root.
 ## Releasing a new version
 
 1. Update `version` in `packages/editor/package.json`, following semantic versioning. Changing a prop or event name is a major version.
-2. Run `npm run typecheck`, `npm run test -w @local/rich-editor` and `npx playwright test`.
+2. Run `npm run typecheck`, `npm run test -w @local/rich-editor`, `npx playwright test`, and the package validation (`npm run validate` in `examples/sample-app-tests`).
 3. Run `npm run build && npm run pack`.
 4. Share the `.tgz` file, or commit it to the location your apps install from, and update each app as described in [Updating the package](docs/INTEGRATION.md#11-updating-the-package).
 

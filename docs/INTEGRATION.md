@@ -663,7 +663,7 @@ Stored content does not need migrating between versions. The HTML and JSON forma
 | Dropdowns or dialogs appear behind the dashboard header or modal | Adjust `z-index` (section 7.4). |
 | Clicking inside a dropdown or dialog closes it, or its inputs can't be focused, when the editor is in a UI-library modal | The modal's focus trap blocks the editor's menus, which are rendered in `<body>`. Disable the trap: `:trap-focus="false"` or `:lock-scroll="false"`, depending on the library. |
 | Brand colors don't apply to dropdowns or dialogs | Add `.re-portal` to your variable selector (section 7.1). |
-| The first Word export reloads the page in development | Vite's dependency pre-bundling. Add `optimizeDeps: { include: ['docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'] }` to `vite.config.ts`. This only affects development. |
+| The first Word export reloads the page in development | Vite's dependency pre-bundling. Add `optimizeDeps: { include: ['@local/rich-editor/docx', 'docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'] }` to `vite.config.ts`. This only affects development. |
 | Images missing from the Word file (shown as `[alt text]`) | The image URL couldn't be fetched, usually because of CORS. Allow your app's origin on the image host (section 6.2). |
 | "Unsaved changes" warning right after loading | The editor normalises HTML on load. Compare against `getHTML()` from the `ready` event (section 5.2). |
 | Content changes after load don't show | Replace the whole value (`content.value = newHtml`) rather than changing it in place, or call `editorRef.value.setContent()`. |

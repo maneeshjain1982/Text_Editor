@@ -2,16 +2,18 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/extensions'
 import { cleanPastedHTML } from '../src/extensions/PasteCleanup'
+import { normalizeContent } from '../src/services/content'
 import { DEFAULT_FEATURES } from '../src/defaults'
 import { toHtmlDocument, toMarkdown } from '../src/services/exporters'
 import { extractHtmlBody, textToHtml } from '../src/services/importers'
 import { readImageSize, validateImage } from '../src/services/image'
 import { resolveToolbar } from '../src/toolbar/items'
 import { PNG_DATA_URL } from './fixtures'
+import type { EditorContent } from '../src/types'
 
 let editor: Editor | undefined
 
-function createEditor(content: string) {
+function createEditor(content: EditorContent) {
   editor = new Editor({
     content,
     extensions: buildExtensions({
@@ -83,6 +85,28 @@ describe('block attributes', () => {
     e.commands.setTextSelection(1)
     e.commands.setBlockLineHeight('2')
     expect(e.getHTML()).toContain('line-height: 2')
+  })
+})
+
+describe('empty JSON documents', () => {
+  it('normalises { type: "doc", content: [] } so formatting can be toggled before typing', () => {
+    expect(normalizeContent({ type: 'doc', content: [] })).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] })
+    expect(normalizeContent({ type: 'doc' })).toEqual({ type: 'doc', content: [{ type: 'paragraph' }] })
+    expect(normalizeContent('')).toBe('')
+    expect(normalizeContent(null)).toBe('')
+
+    // The problem: as *initial* content, the empty doc has no block to hold a cursor.
+    const raw = createEditor({ type: 'doc', content: [] })
+    expect(raw.state.doc.childCount).toBe(0)
+    raw.destroy()
+
+    const e = createEditor(normalizeContent({ type: 'doc', content: [] }))
+    expect(e.state.doc.childCount).toBe(1)
+    e.commands.focus('start')
+    e.commands.toggleBold()
+    expect(e.state.storedMarks?.map((m) => m.type.name)).toEqual(['bold'])
+    e.commands.insertContent('bold text')
+    expect(e.getHTML()).toBe('<p><strong>bold text</strong></p>')
   })
 })
 

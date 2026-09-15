@@ -116,7 +116,12 @@ function setLineHeight(value: string | null) {
 
 // ---- table -------------------------------------------------------------------
 function insertTable({ rows, cols }: { rows: number; cols: number }) {
-  editor.value!.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+  const e = editor.value!
+  const { selection } = e.state
+  const chain = e.chain().focus()
+  // Insert after selected text instead of replacing it.
+  if (!selection.empty && e.isActive('table') === false) chain.setTextSelection(selection.to)
+  chain.insertTable({ rows, cols, withHeaderRow: true }).run()
   open.value = false
 }
 

@@ -8,6 +8,7 @@ import { EDITOR_CONTEXT, type DialogName, type EditorContext } from './context'
 import { DEFAULT_MAX_IMAGE_SIZE, formatBytes } from './services/image'
 import { EXTENSIONS, MIME_TYPES, downloadBlob, printHtml, toHtmlDocument, toMarkdown } from './services/exporters'
 import { importFile as readImportFile } from './services/importers'
+import { normalizeContent } from './services/content'
 import { resolveToolbar } from './toolbar/items'
 import Toolbar from './toolbar/Toolbar.vue'
 import FindReplace from './components/FindReplace.vue'
@@ -88,15 +89,16 @@ const autosaved = readAutosave()
 const serialize = (): EditorContent =>
   props.contentFormat === 'json' ? editor.value!.getJSON() : editor.value!.getHTML()
 
-const isSameContent = (value: EditorContent) => {
+const isSameContent = (raw: EditorContent) => {
   if (!editor.value) return true
+  const value = normalizeContent(raw)
   return typeof value === 'string'
     ? value === editor.value.getHTML() || (!value && editor.value.isEmpty)
     : JSON.stringify(value) === JSON.stringify(editor.value.getJSON())
 }
 
 const editor = useEditor({
-  content: autosaved ?? props.modelValue,
+  content: normalizeContent(autosaved ?? props.modelValue),
   editable: props.editable,
   autofocus: props.autofocus,
   extensions: buildExtensions({
@@ -144,7 +146,7 @@ watch(
 watch(
   () => props.modelValue,
   (value) => {
-    if (!isSameContent(value)) editor.value?.commands.setContent(value, { emitUpdate: false })
+    if (!isSameContent(value)) editor.value?.commands.setContent(normalizeContent(value), { emitUpdate: false })
   },
 )
 
@@ -269,7 +271,7 @@ async function importFile(file: File) {
   try {
     const result = await readImportFile(file)
     const content = 'json' in result ? result.json : result.html
-    editor.value?.chain().setContent(content, { emitUpdate: true }).focus('start').run()
+    editor.value?.chain().setContent(normalizeContent(content), { emitUpdate: true }).focus('start').run()
   } catch (cause) {
     reportError({ type: 'import', message: file.name, cause })
   }
@@ -387,7 +389,7 @@ const api: RichEditorExpose = {
   getText: () => editor.value?.getText({ blockSeparator: '\n\n' }) ?? '',
   getMarkdown: () => toMarkdown(editor.value?.getHTML() ?? ''),
   isEmpty: () => editor.value?.isEmpty ?? true,
-  setContent: (content) => editor.value?.commands.setContent(content, { emitUpdate: true }),
+  setContent: (content) => editor.value?.commands.setContent(normalizeContent(content), { emitUpdate: true }),
   clear: () => editor.value?.commands.clearContent(true),
   focus: () => editor.value?.commands.focus(),
   exportDocx: exportDocxBlob,

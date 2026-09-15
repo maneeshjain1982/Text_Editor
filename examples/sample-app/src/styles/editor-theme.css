@@ -1,0 +1,19 @@
+/*
+ * Integration guide §7.1: match the editor to the app's design system.
+ * .re-portal is included so dropdowns and dialogs pick up the same tokens.
+ */
+.re-root,
+.re-portal {
+  --re-primary: #0f766e;
+  --re-primary-hover: #115e59;
+  --re-primary-soft: rgba(15, 118, 110, 0.12);
+  --re-ui-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --re-radius: 6px;
+}
+
+.re-theme-dark {
+  --re-primary: #2dd4bf;
+  --re-primary-hover: #5eead4;
+  --re-primary-soft: rgba(45, 212, 191, 0.16);
+  --re-on-primary: #04211e;
+}

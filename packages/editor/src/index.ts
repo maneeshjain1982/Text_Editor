@@ -4,6 +4,7 @@ import './styles/index.css'
 
 export { RichEditor }
 export type * from './types'
+export type { JSONContent } from '@tiptap/core'
 export type { Messages, MessageKey } from './i18n/messages'
 export { defaultMessages } from './i18n/messages'
 
