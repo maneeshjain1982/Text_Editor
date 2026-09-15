@@ -1,0 +1,7 @@
+# Keep Gemini Code Assist's context on source code, not generated or vendored files.
+node_modules/
+dist/
+*.tgz
+test-results/
+playwright-report/
+package-lock.json

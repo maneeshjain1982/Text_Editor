@@ -16,6 +16,7 @@ A rich text editor for **Vue 3**, shipped as a local npm package (`@local/rich-e
 - **[API reference](packages/editor/README.md)**: every prop, event, method, slot, CSS variable and toolbar item
 - **[Sample app](examples/sample-app/README.md)**: a working Vue app that installs the editor as a package; how to run it and how each integration step is implemented
 - **[Plan](PLAN.md)**: design decisions and scope
+- **[GEMINI.md](GEMINI.md)**: developer and AI-assistant handoff (architecture, rules, known pitfalls, how to extend)
 
 ---
 
