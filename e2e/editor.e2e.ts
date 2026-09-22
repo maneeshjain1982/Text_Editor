@@ -289,3 +289,109 @@ test('read-only mode hides the toolbar', async ({ page }) => {
   await expect(page.locator('.re-toolbar')).toHaveCount(0)
   await expect(editor(page)).toHaveAttribute('contenteditable', 'false')
 })
+
+// ---------------------------------------------------------------------------
+// AI Canvas (playground uses the offline demo adapter)
+// ---------------------------------------------------------------------------
+
+const aiBar = (page: Page) => page.getByTestId('re-ai-bar')
+
+test('AI: quick action on a selection becomes a suggestion; accept is one undo step and saves a version', async ({ page }) => {
+  const paragraph = editor(page).locator('p', { hasText: 'Revenue grew' })
+  const before = await paragraph.innerText()
+  await paragraph.click({ clickCount: 3 })
+  const menu = page.locator('.re-bubble[aria-label="AI"]')
+  await expect(menu).toBeVisible()
+  await menu.getByRole('button', { name: 'Quick actions' }).click()
+  await page.getByRole('menuitem', { name: 'Make shorter' }).click()
+
+  const suggestion = editor(page).locator('.re-ai-added')
+  await expect(suggestion).toHaveCount(1)
+  await expect(suggestion).toContainText('Revenue grew 18% quarter over quarter')
+  await expect(editor(page).locator('.re-ai-removed').first()).toBeVisible()
+  // Pending suggestions are not part of the content (v-model / exports)
+  await expect(page.getByTestId('output')).toContainText('Churn fell to')
+  await expect(menu).toBeHidden()
+  await shot(page, '10-ai-suggestion')
+
+  await suggestion.getByRole('button', { name: 'Accept' }).click()
+  await expect(editor(page).locator('.re-ai-added')).toHaveCount(0)
+  await expect(paragraph).not.toContainText('Churn fell to')
+  await expect(page.getByTestId('output')).not.toContainText('Churn fell to')
+
+  await page.keyboard.press('Control+z')
+  await expect(paragraph).toHaveText(before)
+
+  await page.keyboard.press('Control+y')
+  await page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Version history' }).click()
+  const versions = page.getByTestId('re-versions')
+  await expect(versions.locator('li')).toHaveCount(1)
+  await expect(versions).toContainText('Before: Make shorter')
+})
+
+test('AI: custom instruction, reject, and Esc', async ({ page }) => {
+  const heading = editor(page).locator('h2').first()
+  await heading.click({ clickCount: 3 })
+  await page.keyboard.press('Control+j')
+  await expect(aiBar(page)).toBeVisible()
+  await expect(editor(page).locator('.re-ai-target')).toBeVisible()
+  await aiBar(page).getByRole('textbox', { name: 'Instruction for AI' }).fill('Make it more casual')
+  await page.keyboard.press('Enter')
+  await expect(editor(page).locator('.re-ai-added')).toContainText('🙂')
+
+  await editor(page).locator('.re-ai-added').getByRole('button', { name: 'Reject' }).click()
+  await expect(editor(page).locator('.re-ai-added')).toHaveCount(0)
+  await expect(heading).toHaveText('Summary')
+
+  await aiBar(page).getByRole('textbox', { name: 'Instruction for AI' }).focus()
+  await page.keyboard.press('Escape')
+  await expect(aiBar(page)).toHaveCount(0)
+})
+
+test('AI: whole-document edit only suggests changes for some blocks; accept all', async ({ page }) => {
+  const blocksBefore = await editor(page).locator(':scope > *').count()
+  await page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Edit whole document…' }).click()
+  await aiBar(page).getByRole('textbox', { name: 'Instruction for AI' }).fill('Tighten the wording')
+  await aiBar(page).getByRole('button', { name: 'Send' }).click()
+
+  const suggestions = editor(page).locator('.re-ai-added')
+  // The demo edits plain paragraphs only; the sample document has two.
+  await expect(suggestions).toHaveCount(2)
+  expect(await suggestions.count()).toBeLessThan(blocksBefore)
+  await expect(aiBar(page)).toContainText('Review 2 suggestions')
+  await shot(page, '11-ai-document')
+
+  await page.getByTestId('re-ai-accept-all').click()
+  await expect(suggestions).toHaveCount(0)
+  await expect(editor(page).getByText('(revised)')).toHaveCount(2)
+  // Layout attributes survive: the centered subtitle stays centered
+  await expect(editor(page).locator('p', { hasText: 'Prepared for the leadership team' })).toHaveCSS('text-align', 'center')
+})
+
+test('AI: generate into an empty document and continue writing', async ({ page }) => {
+  await clearEditor(page)
+  await page.keyboard.press('Control+j')
+  await expect(aiBar(page)).toContainText('Generate')
+  await aiBar(page).getByRole('textbox', { name: 'Instruction for AI' }).fill('Write a project update')
+  await page.keyboard.press('Enter')
+  await expect(editor(page).locator('.re-ai-added table')).toBeVisible()
+  await page.getByTestId('re-ai-accept-all').click()
+  await expect(editor(page).locator('h1')).toHaveText('Project update')
+
+  await editor(page).locator('p').first().click()
+  await page.keyboard.press('End')
+  await page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Continue writing' }).click()
+  await expect(editor(page).locator('.re-ai-added')).toContainText('Building on this')
+  await page.keyboard.press('Escape')
+  await expect(editor(page).locator('.re-ai-added')).toHaveCount(0)
+})
+
+test('AI: controls are hidden without an adapter', async ({ page }) => {
+  await page.getByTestId('ai-toggle').uncheck()
+  await expect(page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true })).toHaveCount(0)
+  await editor(page).locator('p', { hasText: 'Revenue grew' }).click({ clickCount: 3 })
+  await expect(page.locator('.re-bubble[aria-label="AI"]')).toHaveCount(0)
+})

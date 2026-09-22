@@ -1,6 +1,6 @@
 # @local/rich-editor
 
-> This is the API reference. For step-by-step setup in an existing app, see the **[Integration guide](../../docs/INTEGRATION.md)**.
+> This is the API reference. For step-by-step setup in an existing app, see the **[Integration guide](../../docs/INTEGRATION.md)**. For end users, see the **[User guide](../../docs/USER-GUIDE.md)**.
 
 A rich text editor component for **Vue 3**. It supports tables, images and Word (.docx) import and export, and it is designed to be embedded in an existing dashboard.
 
@@ -11,6 +11,7 @@ A rich text editor component for **Vue 3**. It supports tables, images and Word 
 - Editing tools: undo and redo, find and replace, links, special characters and emoji, paste cleanup (Word and Google Docs), paste as plain text, word and character count
 - Files: open **.docx**, .html, .md, .txt and .json; download **.docx**, .html, .md, .txt and .json; print or save as PDF
 - Two layouts, `document` (an A4 or Letter page) and `inline`, plus full screen, light, dark and automatic themes
+- **AI Canvas (optional):** generate drafts, rewrite a selection, continue writing, edit the whole document, or **chat with the document** (cited answers, changes as suggestions). Changes appear as suggestions you accept or reject, and only the affected text is regenerated. Works with Gemini (reference server included) or any model behind your backend.
 - Built-in accessibility: WAI-ARIA toolbar with arrow-key navigation, labelled controls, focus-trapped dialogs, and reduced-motion support
 
 ---
@@ -89,8 +90,13 @@ The editor needs the browser, so render it on the client only:
 | `messages` | `Partial<Messages>` | English | Replaces any interface text (see `defaultMessages`) |
 | `extensions` | `Extensions` | `[]` | Extra TipTap extensions to add |
 | `autofocus` | `boolean` | `false` | |
+| `ai` | `AiAdapter` | – | Turns on the AI Canvas. See [AI Canvas](#ai-canvas). |
+| `ai-actions` | `AiQuickAction[]` | `DEFAULT_AI_ACTIONS` | Quick actions offered for a selection |
+| `max-versions` | `number` | `30` | Versions kept in memory (a version is saved before each accepted AI change) |
+| `v-model:chat-history` | `AiChatMessage[]` | – | The document chat conversation. Bind it to restore and save the chat per document. |
+| `chat-starters` | `string[]` | 5 built-in questions | Starter questions shown in an empty chat |
 
-`features` and `extensions` are read once, when the editor mounts. To change them afterwards, remount the component, for example by changing its `:key`.
+`features` (except `ai`) and `extensions` are read once, when the editor mounts. To change them afterwards, remount the component, for example by changing its `:key`.
 
 ## Events
 
@@ -99,8 +105,13 @@ The editor needs the browser, so render it on the client only:
 | `update:modelValue` | `string \| JSONContent` |
 | `ready` | `RichEditorExpose` (the API below) |
 | `focus`, `blur` | `FocusEvent` |
-| `error` | `{ type: 'image-type' \| 'image-size' \| 'image-upload' \| 'import' \| 'export' \| 'clipboard', message, cause? }` |
+| `error` | `{ type: 'image-type' \| 'image-size' \| 'image-upload' \| 'import' \| 'export' \| 'clipboard' \| 'ai', message, cause? }` |
 | `saved` | Emitted when an autosave completes |
+| `ai-request` | `AiRequest`: every AI request, e.g. for usage logging |
+| `ai-applied` | `{ task, accepted }`: after suggestions are accepted |
+| `version-created` | `EditorVersion`: save it to your backend if versions should outlive the page |
+| `update:chatHistory` | `AiChatMessage[]`: the conversation after each question, answer or clear |
+| `chat-message` | `AiChatMessage`: each question and answer, e.g. for logging |
 
 ## Methods (template ref)
 
@@ -121,6 +132,23 @@ await editor.value.importFile(file)          // .docx | .html | .md | .txt | .js
 editor.value.print()
 editor.value.toggleFullscreen()
 editor.value.editor                           // the underlying TipTap Editor, for advanced use
+
+// AI Canvas (with the `ai` prop)
+await editor.value.aiGenerate('A project update with a status table')
+await editor.value.aiEditSelection('Make this more formal')
+await editor.value.aiContinue()
+await editor.value.aiEditDocument('Fix spelling everywhere')
+editor.value.aiStop()
+editor.value.getSuggestionCount()
+editor.value.acceptAllSuggestions()
+editor.value.rejectAllSuggestions()
+editor.value.getVersions()                   // EditorVersion[], newest first
+editor.value.restoreVersion(id)
+
+// Chat with the document
+editor.value.openChat()                        // or openChat(false) to close
+await editor.value.askDocument('What are the open risks?')
+editor.value.clearChat()
 ```
 
 ## Slots
@@ -155,7 +183,7 @@ For the full list of variables, see `src/styles/tokens.css`.
 <RichEditor :toolbar="[['bold', 'italic', 'underline'], ['bulletList', 'orderedList'], ['link', 'image', 'table']]" />
 ```
 
-Available items: `file`, `undo`, `redo`, `heading`, `fontFamily`, `fontSize`, `bold`, `italic`, `underline`, `strike`, `code`, `superscript`, `subscript`, `color`, `highlight`, `clearFormatting`, `align`, `lineHeight`, `indent`, `outdent`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `codeBlock`, `horizontalRule`, `link`, `image`, `table`, `specialChars`, `findReplace`, `pastePlain`, `print`, `fullscreen`.
+Available items: `file`, `undo`, `redo`, `heading`, `fontFamily`, `fontSize`, `bold`, `italic`, `underline`, `strike`, `code`, `superscript`, `subscript`, `color`, `highlight`, `clearFormatting`, `align`, `lineHeight`, `indent`, `outdent`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `codeBlock`, `horizontalRule`, `link`, `image`, `table`, `specialChars`, `findReplace`, `pastePlain`, `print`, `fullscreen`, `ai` and `chat` (shown only when the `ai` prop is set).
 
 When the toolbar doesn't fit, groups that don't fit move into a **More (⋯)** menu.
 
@@ -178,6 +206,87 @@ async function upload(file: File) {
 A preview appears immediately while the upload runs. If the upload fails, the image is removed and an `error` event is emitted.
 
 ---
+
+## AI Canvas
+
+A way of working like Gemini Canvas: the AI writes a draft, and afterwards you point at what to change. Only that part is sent and regenerated. Every change appears as a **suggestion** (old text struck through, new text highlighted) until someone accepts or rejects it.
+
+```vue
+<script setup lang="ts">
+import { RichEditor, createHttpAiAdapter } from '@local/rich-editor'
+// Calls your backend, which calls Gemini. See examples/ai-server.
+const ai = createHttpAiAdapter({ url: '/api/ai/complete' })
+</script>
+
+<template>
+  <RichEditor v-model="html" :ai="ai" />
+</template>
+```
+
+| What the user does | Where | Sent to the model |
+|---|---|---|
+| **Ask AI** about selected text, or pick a quick action (improve, fix grammar, shorter, longer, formal, casual, simplify, summarize, list, table, translate) | Menu below the selection · Ctrl+J · AI menu | The selection plus about 2,000 characters around it |
+| **Generate content** | AI menu · Ctrl+J with nothing selected | The prompt; in an empty document it fills the page, otherwise it inserts after the current block |
+| **Continue writing** | AI menu | The text around the cursor |
+| **Edit whole document** | AI menu | All blocks with ids; the model returns **only the changed blocks** |
+| Review | In the document: **Accept** / **Reject** on each suggestion; the AI bar: **Accept all**, **Reject all**, **Try again**, or type a follow-up to refine | – |
+| **Version history** | AI menu | A snapshot is saved before every accepted AI change; **Restore** brings it back |
+
+What the editor guarantees:
+
+- **Only accepted content counts.** Pending suggestions are not in `v-model`, exports or autosave.
+- **Accepting is one undo step.** Ctrl+Z undoes it; Esc rejects all pending suggestions.
+- **Suggestions follow edits elsewhere.** If the text a suggestion covers is edited, the suggestion is discarded rather than overwriting the change.
+- **Model output is checked.** It is parsed through the editor schema (scripts and unknown markup are dropped), and replaced blocks keep their alignment, indent and line spacing.
+- **What gets lost.** The AI works in Markdown, so colors, fonts and highlights **inside the rewritten text** are not kept. Everything outside it is untouched.
+
+### Chat with the document
+
+The **Chat** button in the toolbar (or **AI → Chat with document**, or Ctrl+Alt+J) opens a panel beside the page, or an overlay on narrow screens.
+
+- **Answers come from the document** and cite their sources as numbered links. Clicking one scrolls to the paragraph and highlights it. Links follow edits; if the source is deleted, the link is disabled.
+- **Selected text** is attached to the next question ("Is this figure right?").
+- **Follow-up questions** keep the conversation (the last 10 turns are sent).
+- **Ask for a change** ("make the intro more formal and add a risks section"): the answer explains it, and the changes appear in the document as suggestions, with **Accept** / **Reject** in the message.
+- **Use an answer:** **Copy**, **Insert in document** (after the current paragraph), or **Replace selection**. Insertions are suggestions too, and citation markers are removed.
+- **Long documents:** up to about 150,000 characters (roughly 60 pages) are sent whole. Beyond that, the part around the cursor is sent, and the answer says so.
+- **Cost:** each question sends the document. It's placed first in the prompt so Gemini's implicit caching can reuse it for follow-ups.
+
+```vue
+<RichEditor v-model="content" :ai="ai" v-model:chat-history="chat" :chat-starters="['What changed since v1?', 'List open risks']" />
+```
+
+Turn the chat off with `:features="{ chat: false }"`. Restored chat history is shown, but its source links are disabled: the document may have changed since.
+
+### Adapters
+
+An adapter is one function: `complete(request, { signal, onChunk }) => Promise<string>`.
+
+| Adapter | Use |
+|---|---|
+| `createHttpAiAdapter({ url, headers?, credentials? })` | Your backend speaks the reference protocol (JSON request, NDJSON stream). `headers` may be a function, for fresh auth tokens. |
+| `createDemoAiAdapter()` | Offline, deterministic output for demos and tests. It never calls a model. |
+| Your own | Any backend: call it, stream text with `onChunk(delta)`, return the full text, and respect `signal` for Stop |
+
+`request` contains the `task`, `instruction`, `selection`/`context`/`blocks`, and a ready-made `prompt` (`{ system, user }`). In production, rebuild the prompt on the server with `buildPrompt(request)` from `@local/rich-editor/ai` (no Vue or DOM needed), so the endpoint can't be used as a general-purpose model proxy.
+
+### Custom quick actions
+
+```ts
+import { DEFAULT_AI_ACTIONS, type AiQuickAction } from '@local/rich-editor'
+
+const aiActions: AiQuickAction[] = [
+  ...DEFAULT_AI_ACTIONS,
+  { id: 'exec', label: 'Executive summary', instruction: 'Rewrite as a three-bullet executive summary.' },
+  { id: 'ko', label: 'Translate to Korean', instruction: 'Translate this text to Korean.' },
+]
+```
+
+Default labels come from `messages` (keys `aiAction…`), so they translate with the rest of the UI. Set `prefill: true` to put the instruction in the input for the user to complete instead of sending it.
+
+### Styling
+
+CSS variables: `--re-ai-accent`, `--re-ai-accent-soft`, `--re-ai-added-bg`, `--re-ai-added-border`, `--re-ai-removed-bg`, `--re-ai-removed-text`. Each has a dark-theme value.
 
 ## Word (.docx)
 
@@ -222,6 +331,9 @@ The .docx, Markdown and syntax-highlighting libraries load only when they are fi
 | Align left / center / right / justify | Ctrl+Shift+L / E / R / J |
 | Undo / Redo | Ctrl+Z / Ctrl+Shift+Z |
 | Paste as plain text | Ctrl+Shift+V |
+| Ask AI (selection) / Generate (no selection) | Ctrl+J |
+| Reject all AI suggestions | Esc |
+| Open or close the document chat | Ctrl+Alt+J |
 | Next table cell | Tab |
 
 On macOS, use ⌘ instead of Ctrl.

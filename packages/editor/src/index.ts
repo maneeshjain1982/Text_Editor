@@ -14,6 +14,11 @@ export { toHtmlDocument, toMarkdown } from './services/exporters'
 export { buildExtensions } from './extensions'
 export { TOOLBAR_PRESETS } from './toolbar/items'
 
+// AI Canvas: browser helpers. Server-side prompt building lives in '@local/rich-editor/ai'.
+export { DEFAULT_AI_ACTIONS, createDefaultAiActions } from './ai/actions'
+export { createDemoAiAdapter } from './ai/demo'
+export { createHttpAiAdapter, type HttpAiAdapterOptions } from './ai/http'
+
 /** Optional global registration: `app.use(RichEditorPlugin)` → `<RichEditor />` everywhere. */
 export const RichEditorPlugin: Plugin = {
   install(app: App) {

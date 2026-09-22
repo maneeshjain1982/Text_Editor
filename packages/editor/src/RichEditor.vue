@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { EditorContent as TiptapContent, useEditor } from '@tiptap/vue-3'
 import type { JSONContent } from '@tiptap/core'
 import { buildExtensions } from './extensions'
@@ -8,7 +8,7 @@ import { EDITOR_CONTEXT, type DialogName, type EditorContext } from './context'
 import { DEFAULT_MAX_IMAGE_SIZE, formatBytes } from './services/image'
 import { EXTENSIONS, MIME_TYPES, downloadBlob, printHtml, toHtmlDocument, toMarkdown } from './services/exporters'
 import { importFile as readImportFile } from './services/importers'
-import { normalizeContent } from './services/content'
+import { ensureTrailingParagraph, normalizeContent } from './services/content'
 import { resolveToolbar } from './toolbar/items'
 import Toolbar from './toolbar/Toolbar.vue'
 import FindReplace from './components/FindReplace.vue'
@@ -19,8 +19,16 @@ import LinkMenu from './components/menus/LinkMenu.vue'
 import LinkDialog from './components/dialogs/LinkDialog.vue'
 import ImageDialog from './components/dialogs/ImageDialog.vue'
 import SpecialCharsDialog from './components/dialogs/SpecialCharsDialog.vue'
+import VersionsDialog from './components/dialogs/VersionsDialog.vue'
+import AiBar from './components/ai/AiBar.vue'
+import AiSelectionMenu from './components/ai/AiSelectionMenu.vue'
+import ChatPanel from './components/ai/ChatPanel.vue'
+import { createChatController } from './ai/chat'
+import { createAiController, type AiController } from './ai/controller'
+import { createDefaultAiActions } from './ai/actions'
+import { getAiSuggestionState } from './extensions/AiSuggestion'
 import { DEFAULT_FEATURES, DEFAULT_FONTS } from './defaults'
-import type { EditorContent, EditorError, ExportFormat, RichEditorExpose, RichEditorProps } from './types'
+import type { AiAppliedEvent, AiChatMessage, AiRequest, EditorContent, EditorError, EditorVersion, ExportFormat, RichEditorExpose, RichEditorProps } from './types'
 
 defineOptions({ name: 'RichEditor' })
 
@@ -43,6 +51,11 @@ const props = withDefaults(defineProps<RichEditorProps>(), {
   documentName: 'document',
   messages: () => ({}),
   extensions: () => [],
+  ai: undefined,
+  aiActions: undefined,
+  maxVersions: 30,
+  chatHistory: undefined,
+  chatStarters: undefined,
 })
 
 const emit = defineEmits<{
@@ -52,11 +65,21 @@ const emit = defineEmits<{
   blur: [event: FocusEvent]
   error: [error: EditorError]
   saved: [content: EditorContent]
+  'ai-request': [request: AiRequest]
+  'ai-applied': [event: AiAppliedEvent]
+  'version-created': [version: EditorVersion]
+  'update:chatHistory': [history: AiChatMessage[]]
+  'chat-message': [message: AiChatMessage]
 }>()
 
 const t = computed(() => createTranslator(props.messages))
 const translate: EditorContext['t'] = (key, params) => t.value(key, params)
-const features = computed(() => ({ ...DEFAULT_FEATURES, ...props.features }))
+const features = computed(() => {
+  const merged = { ...DEFAULT_FEATURES, ...props.features }
+  // AI needs both the feature flag and an adapter.
+  const ai = merged.ai && !!props.ai
+  return { ...merged, ai, chat: ai && merged.chat }
+})
 
 // ---------------------------------------------------------------------------
 // Toasts / errors
@@ -74,6 +97,7 @@ function reportError(error: EditorError) {
     import: translate('errorImport'),
     export: translate('errorExport'),
     clipboard: translate('errorClipboard'),
+    ai: error.message || translate('errorAi'),
   }
   const id = ++toastId
   const detail = error.type.startsWith('image') && error.message ? ` (${error.message})` : ''
@@ -109,6 +133,14 @@ const editor = useEditor({
       maxImageSize: props.maxImageSize,
       onError: reportError,
     },
+    ai: {
+      label: (key) => translate(key),
+      onBeforeApply: (label) => snapshotVersion(label),
+      onApplied: (count) => emit('ai-applied', { task: aiController.value?.state.mode ?? 'edit-selection', accepted: count }),
+      onDiscarded: () => {
+        if (aiController.value?.state.open) aiController.value.state.message = translate('aiDiscarded')
+      },
+    },
     extra: props.extensions,
   }),
   editorProps: {
@@ -126,7 +158,8 @@ const editor = useEditor({
   },
   onFocus: ({ event }) => emit('focus', event),
   onBlur: ({ event }) => emit('blur', event),
-  onCreate: () => {
+  onCreate: ({ editor: created }) => {
+    ensureTrailingParagraph(created)
     // Content restored from autosave must reach the parent's v-model too.
     if (autosaved !== undefined) emit('update:modelValue', serialize())
     emit('ready', api)
@@ -146,7 +179,9 @@ watch(
 watch(
   () => props.modelValue,
   (value) => {
-    if (!isSameContent(value)) editor.value?.commands.setContent(normalizeContent(value), { emitUpdate: false })
+    if (isSameContent(value) || !editor.value) return
+    editor.value.commands.setContent(normalizeContent(value), { emitUpdate: false })
+    ensureTrailingParagraph(editor.value)
   },
 )
 
@@ -194,6 +229,80 @@ function scheduleAutosave() {
 }
 
 // ---------------------------------------------------------------------------
+// AI Canvas and versions
+// ---------------------------------------------------------------------------
+const versions = shallowRef<EditorVersion[]>([])
+let versionCounter = 0
+
+/** Save the current document before an AI change is applied. */
+function snapshotVersion(label: string) {
+  const e = editor.value
+  if (!e) return
+  const version: EditorVersion = { id: `v${Date.now().toString(36)}${++versionCounter}`, label, createdAt: Date.now(), content: e.getJSON() }
+  versions.value = [version, ...versions.value].slice(0, props.maxVersions)
+  emit('version-created', version)
+}
+
+function restoreVersion(id: string) {
+  const e = editor.value
+  const version = versions.value.find((v) => v.id === id)
+  if (!e || !version) return
+  e.commands.rejectAllAiSuggestions()
+  snapshotVersion(translate('versionBeforeRestore'))
+  e.chain().setContent(normalizeContent(version.content), { emitUpdate: true }).focus().run()
+  ensureTrailingParagraph(e)
+}
+
+const aiInstance: AiController = createAiController({
+  editor,
+  adapter: () => props.ai,
+  t: translate,
+  title: () => (props.documentName && props.documentName !== 'document' ? props.documentName : undefined),
+  onRequest: (request) => emit('ai-request', request),
+  onError: (message, cause) => {
+    emit('error', { type: 'ai', message, cause })
+    // The AI bar shows its own errors; toast only when it is closed.
+    if (!aiInstance.state.open) reportError({ type: 'ai', message })
+  },
+})
+const aiController = computed(() => (features.value.ai ? aiInstance : null))
+
+const chatInstance = createChatController({
+  editor,
+  adapter: () => props.ai,
+  t: translate,
+  title: () => (props.documentName && props.documentName !== 'document' ? props.documentName : undefined),
+  initialHistory: props.chatHistory,
+  onRequest: (request) => emit('ai-request', request),
+  onMessage: (message, history) => {
+    emit('chat-message', message)
+    emit('update:chatHistory', history)
+  },
+  onError: (message, cause) => emit('error', { type: 'ai', message, cause }),
+  onClear: () => emit('update:chatHistory', []),
+})
+const chatController = computed(() => (features.value.chat ? chatInstance : null))
+const chatStarters = computed(
+  () =>
+    props.chatStarters ??
+    (['chatStarterSummarize', 'chatStarterKeyPoints', 'chatStarterActions', 'chatStarterIssues', 'chatStarterTitle'] as const).map((k) => translate(k)),
+)
+const aiActions = computed(() => props.aiActions ?? createDefaultAiActions(translate))
+
+/** Ctrl/Cmd+J: Ask AI about the selection, or generate at the cursor when nothing is selected. */
+function openAi() {
+  const ai = aiController.value
+  if (!ai || !props.editable) return
+  ai.open(editor.value?.state.selection.empty ? 'generate' : 'edit-selection')
+}
+
+async function runAi(mode: 'generate' | 'edit-selection' | 'continue' | 'edit-document', instruction: string, label?: string) {
+  const ai = aiController.value
+  if (!ai || !ai.open(mode)) return
+  await ai.run(instruction, label, mode)
+}
+
+// ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
 const isFullscreen = ref(false)
@@ -215,6 +324,7 @@ const dialogOpen = (name: DialogName) =>
 const linkOpen = dialogOpen('link')
 const imageOpen = dialogOpen('image')
 const charsOpen = dialogOpen('specialChars')
+const versionsOpen = dialogOpen('versions')
 
 function toggleFullscreen(value?: boolean) {
   isFullscreen.value = value ?? !isFullscreen.value
@@ -271,7 +381,9 @@ async function importFile(file: File) {
   try {
     const result = await readImportFile(file)
     const content = 'json' in result ? result.json : result.html
-    editor.value?.chain().setContent(normalizeContent(content), { emitUpdate: true }).focus('start').run()
+    if (!editor.value) return
+    editor.value.chain().setContent(normalizeContent(content), { emitUpdate: true }).focus('start').run()
+    ensureTrailingParagraph(editor.value)
   } catch (cause) {
     reportError({ type: 'import', message: file.name, cause })
   }
@@ -312,6 +424,12 @@ function onKeydown(e: KeyboardEvent) {
   } else if (mod && !e.altKey && key === 'k' && props.editable) {
     e.preventDefault()
     openDialog('link')
+  } else if (mod && e.altKey && key === 'j' && chatController.value) {
+    e.preventDefault()
+    chatController.value.setOpen()
+  } else if (mod && !e.altKey && !e.shiftKey && key === 'j' && aiController.value) {
+    e.preventDefault()
+    openAi()
   } else if (e.key === 'Escape' && findOpen.value) {
     findOpen.value = false
   } else if (e.key === 'Escape' && isFullscreen.value && !dialog.value) {
@@ -351,6 +469,8 @@ const rootStyle = computed(() => {
 })
 
 onBeforeUnmount(() => {
+  aiInstance.stop()
+  chatInstance.stop()
   clearTimeout(saveTimer)
   clearTimeout(savedTimer)
   media?.removeEventListener?.('change', onMedia)
@@ -378,6 +498,9 @@ provide(EDITOR_CONTEXT, {
   print,
   pastePlain,
   reportError,
+  ai: aiController,
+  chat: chatController,
+  aiActions,
 } satisfies EditorContext)
 
 const api: RichEditorExpose = {
@@ -389,7 +512,11 @@ const api: RichEditorExpose = {
   getText: () => editor.value?.getText({ blockSeparator: '\n\n' }) ?? '',
   getMarkdown: () => toMarkdown(editor.value?.getHTML() ?? ''),
   isEmpty: () => editor.value?.isEmpty ?? true,
-  setContent: (content) => editor.value?.commands.setContent(normalizeContent(content), { emitUpdate: true }),
+  setContent: (content) => {
+    if (!editor.value) return
+    editor.value.commands.setContent(normalizeContent(content), { emitUpdate: true })
+    ensureTrailingParagraph(editor.value)
+  },
   clear: () => editor.value?.commands.clearContent(true),
   focus: () => editor.value?.commands.focus(),
   exportDocx: exportDocxBlob,
@@ -397,6 +524,24 @@ const api: RichEditorExpose = {
   importFile,
   print,
   toggleFullscreen,
+  aiGenerate: (prompt) => runAi('generate', prompt),
+  aiEditSelection: (instruction) => runAi('edit-selection', instruction),
+  aiContinue: (guidance = '') => runAi('continue', guidance, translate('aiContinue')),
+  aiEditDocument: (instruction) => runAi('edit-document', instruction),
+  aiStop: () => aiInstance.stop(),
+  getSuggestionCount: () => (editor.value ? getAiSuggestionState(editor.value.state).suggestions.length : 0),
+  acceptAllSuggestions: () => void editor.value?.commands.acceptAllAiSuggestions(),
+  rejectAllSuggestions: () => void editor.value?.commands.rejectAllAiSuggestions(),
+  getVersions: () => versions.value,
+  restoreVersion,
+  openChat: (open) => chatController.value?.setOpen(open),
+  askDocument: async (question) => {
+    const chat = chatController.value
+    if (!chat) return
+    chat.setOpen(true)
+    await chat.send(question)
+  },
+  clearChat: () => chatInstance.clear(),
 }
 
 defineExpose(api)
@@ -409,11 +554,15 @@ defineExpose(api)
     <slot name="toolbar-end" :editor="editor" />
 
     <FindReplace v-if="editor && findOpen" />
+    <AiBar v-if="editor && aiController && aiController.state.open && editable" :controller="aiController" />
 
-    <div ref="scrollRef" class="re-scroll">
-      <div class="re-surface">
-        <TiptapContent :editor="editor" class="re-editor-content" />
+    <div class="re-body">
+      <div ref="scrollRef" class="re-scroll">
+        <div class="re-surface">
+          <TiptapContent :editor="editor" class="re-editor-content" />
+        </div>
       </div>
+      <ChatPanel v-if="editor && chatController && chatController.open.value" :chat="chatController" :starters="chatStarters" />
     </div>
 
     <StatusBar v-if="features.statusBar" :saved="savedFlag" :page-size="pageSize" :layout="layout" />
@@ -427,6 +576,10 @@ defineExpose(api)
         <LinkDialog v-model:open="linkOpen" />
         <ImageDialog v-if="features.images" v-model:open="imageOpen" :replace="!!dialogPayload?.replace" />
         <SpecialCharsDialog v-model:open="charsOpen" />
+        <template v-if="aiController">
+          <AiSelectionMenu :editor="editor" :controller="aiController" :scroll-target="scrollRef" />
+          <VersionsDialog v-model:open="versionsOpen" :versions="versions" @restore="restoreVersion" />
+        </template>
       </template>
     </template>
 

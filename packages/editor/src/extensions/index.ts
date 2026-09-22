@@ -15,16 +15,19 @@ import { Image, type ImageOptions } from './Image'
 import { ColoredTableCell, ColoredTableHeader } from './Table'
 import { PasteCleanup } from './PasteCleanup'
 import { lowlight } from './lowlight'
+import { AiSuggestionExtension, type AiSuggestionOptions } from './AiSuggestion'
 import type { EditorFeatures } from '../types'
 
 export interface BuildExtensionsOptions {
   placeholder: () => string
   features: Required<EditorFeatures>
   image: ImageOptions
+  /** AI suggestion callbacks. The extension is always registered (it is inert without suggestions). */
+  ai?: Partial<AiSuggestionOptions>
   extra?: Extensions
 }
 
-export function buildExtensions({ placeholder, features, image, extra = [] }: BuildExtensionsOptions): Extensions {
+export function buildExtensions({ placeholder, features, image, ai, extra = [] }: BuildExtensionsOptions): Extensions {
   const extensions: Extensions = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -49,6 +52,7 @@ export function buildExtensions({ placeholder, features, image, extra = [] }: Bu
     BlockAttributes,
     SearchReplace,
     PasteCleanup,
+    AiSuggestionExtension.configure(ai ?? {}),
   ]
 
   if (features.codeHighlight) extensions.push(CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }))
@@ -68,3 +72,4 @@ export function buildExtensions({ placeholder, features, image, extra = [] }: Bu
 
 export { findMatches } from './SearchReplace'
 export { cleanPastedHTML } from './PasteCleanup'
+export { AiSuggestionExtension, getAiSuggestionState, aiSuggestionKey, type AiSuggestion } from './AiSuggestion'

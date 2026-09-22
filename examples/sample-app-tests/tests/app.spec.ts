@@ -173,3 +173,72 @@ test('editor follows the app’s dark mode and theme tokens', async ({ page }) =
   await toolbarButton(page, 'Text color').click()
   await expect(page.locator('.re-portal.re-popover')).toHaveClass(/re-theme-dark/)
 })
+
+test('AI Canvas: edits a selection through the app proxy and the Gemini server (mock mode)', async ({ page }) => {
+  const health = await page.request.get('/api/ai/health')
+  expect(await health.json()).toMatchObject({ ok: true, mock: true })
+
+  await page.getByTestId('row-welcome').getByRole('link', { name: 'Edit' }).click()
+  await expect(editor(page)).toBeVisible()
+  const paragraph = editor(page).locator('p').first()
+  await paragraph.click({ clickCount: 3 })
+  await page.keyboard.press('Control+j')
+  const bar = page.getByTestId('re-ai-bar')
+  await bar.getByRole('textbox', { name: 'Instruction for AI' }).fill('Make it longer')
+
+  const [request] = await Promise.all([page.waitForRequest('**/api/ai/complete'), page.keyboard.press('Enter')])
+  const body = request.postDataJSON()
+  expect(body.task).toBe('edit-selection')
+  expect(body.selection).toContain('This sample app uses')
+
+  const suggestion = editor(page).locator('.re-ai-added')
+  await expect(suggestion).toContainText('This point matters because')
+  // Not saved until accepted
+  await expect(page.getByTestId('save-status')).toHaveText('All changes saved')
+  await page.getByTestId('re-ai-accept-all').click()
+  await expect(paragraph).toContainText('This point matters because')
+  await expect(page.getByTestId('save-status')).toHaveText('Unsaved changes')
+})
+
+test('AI Canvas: server validation errors are shown to the user', async ({ page }) => {
+  const bad = await page.request.post('/api/ai/complete', { data: { task: 'not-a-task', instruction: 'x' } })
+  expect(bad.status()).toBe(400)
+
+  await page.getByTestId('new-document').click()
+  await expect(editor(page)).toBeVisible()
+  // Stop the proxy target from answering: simulate the backend being down
+  await page.route('**/api/ai/complete', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"The AI service is unavailable."}' }))
+  await editor(page).click()
+  await page.keyboard.press('Control+j')
+  await page.getByTestId('re-ai-bar').getByRole('textbox', { name: 'Instruction for AI' }).fill('Write a plan')
+  await page.keyboard.press('Enter')
+  await expect(page.getByTestId('re-ai-bar')).toContainText('The AI request failed')
+  await expect(page.getByTestId('re-ai-bar').getByRole('button', { name: 'Try again' })).toBeVisible()
+  // The browser logs the simulated 503 as a console error; that one is expected.
+  const errors = (page as any).__errors as string[]
+  errors.splice(0, errors.length, ...errors.filter((e) => !e.includes('503')))
+})
+
+test('Chat with document: cited answer through the Gemini server (mock), history kept per document', async ({ page }) => {
+  await page.getByTestId('row-welcome').getByRole('link', { name: 'Edit' }).click()
+  await expect(editor(page)).toBeVisible()
+  await toolbarButton(page, 'Chat with document').click()
+  const chat = page.getByTestId('re-chat')
+  const input = chat.getByRole('textbox', { name: 'Question about the document' })
+  await input.fill('What does the document say about Word export?')
+
+  const [request] = await Promise.all([page.waitForRequest('**/api/ai/complete'), input.press('Enter')])
+  const body = request.postDataJSON()
+  expect(body.task).toBe('chat')
+  expect(body.blocks.length).toBeGreaterThan(1)
+
+  const answer = chat.locator('.re-chat-assistant')
+  await expect(answer).toContainText('Word export')
+  await answer.locator('.re-chat-sources button').first().click()
+  await expect(editor(page).locator('.re-ai-flash')).toHaveCount(1)
+
+  // History survives a reload (saved through v-model:chat-history)
+  await page.reload()
+  await toolbarButton(page, 'Chat with document').click()
+  await expect(page.getByTestId('re-chat').locator('.re-chat-question')).toHaveText('What does the document say about Word export?')
+})

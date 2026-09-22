@@ -21,6 +21,7 @@ export type ToolbarItem =
   | 'link' | 'image' | 'table' | 'specialChars'
   | 'findReplace' | 'pastePlain'
   | 'file' | 'print' | 'fullscreen'
+  | 'ai' | 'chat'
 
 /** A toolbar group is rendered between separators. */
 export type ToolbarGroup = ToolbarItem[]
@@ -34,6 +35,10 @@ export interface EditorFeatures {
   codeHighlight?: boolean
   docx?: boolean
   statusBar?: boolean
+  /** AI Canvas. Only active when an `ai` adapter is also provided. */
+  ai?: boolean
+  /** Chat with the document (part of the AI Canvas; needs the `ai` adapter). */
+  chat?: boolean
 }
 
 export type ExportFormat = 'html' | 'json' | 'markdown' | 'text' | 'docx'
@@ -42,9 +47,35 @@ export type ExportFormat = 'html' | 'json' | 'markdown' | 'text' | 'docx'
 export type UploadImageFn = (file: File) => Promise<string>
 
 export interface EditorError {
-  type: 'image-type' | 'image-size' | 'image-upload' | 'import' | 'export' | 'clipboard'
+  type: 'image-type' | 'image-size' | 'image-upload' | 'import' | 'export' | 'clipboard' | 'ai'
   message: string
   cause?: unknown
+}
+
+export type {
+  AiAdapter,
+  AiAdapterOptions,
+  AiPrompt,
+  AiQuickAction,
+  AiRequest,
+  AiTask,
+  AiBlock,
+  AiResponseFormat,
+  AiChatMessage,
+} from './ai/types'
+
+export interface AiAppliedEvent {
+  task: import('./ai/types').AiTask
+  /** Number of suggestions accepted in this action. */
+  accepted: number
+}
+
+export interface EditorVersion {
+  id: string
+  /** What happened after this snapshot, e.g. "AI: Make shorter". */
+  label: string
+  createdAt: number
+  content: JSONContent
 }
 
 export interface RichEditorProps {
@@ -77,6 +108,19 @@ export interface RichEditorProps {
   messages?: Partial<Messages>
   /** Extra TipTap extensions appended to the built-in set. */
   extensions?: Extensions
+  /**
+   * AI Canvas adapter. It sends requests to *your* backend, which calls the model
+   * (the editor never holds an API key). Without it, no AI controls are shown.
+   */
+  ai?: import('./ai/types').AiAdapter
+  /** Quick actions offered for a selection. Defaults to `DEFAULT_AI_ACTIONS`. */
+  aiActions?: import('./ai/types').AiQuickAction[]
+  /** Max versions kept in memory (default 30). */
+  maxVersions?: number
+  /** Chat conversation, for `v-model:chat-history` (restore or save it per document). */
+  chatHistory?: import('./ai/types').AiChatMessage[]
+  /** Starter questions shown in an empty chat. */
+  chatStarters?: string[]
 }
 
 export interface RichEditorExpose {
@@ -98,4 +142,28 @@ export interface RichEditorExpose {
   importFile: (file: File) => Promise<void>
   print: () => void
   toggleFullscreen: (value?: boolean) => void
+
+  // --- AI Canvas (require the `ai` prop) ---
+  /** Generate content from a prompt: replaces an empty document, otherwise inserts after the current block. */
+  aiGenerate: (prompt: string) => Promise<void>
+  /** Rewrite the current selection according to an instruction. */
+  aiEditSelection: (instruction: string) => Promise<void>
+  /** Continue writing at the cursor. */
+  aiContinue: (guidance?: string) => Promise<void>
+  /** Apply an instruction to the whole document; only changed blocks become suggestions. */
+  aiEditDocument: (instruction: string) => Promise<void>
+  /** Cancel the running AI request. */
+  aiStop: () => void
+  /** Pending AI suggestions. */
+  getSuggestionCount: () => number
+  acceptAllSuggestions: () => void
+  rejectAllSuggestions: () => void
+  /** Snapshots saved before each accepted AI change (newest first). */
+  getVersions: () => EditorVersion[]
+  restoreVersion: (id: string) => void
+  /** Open, close or toggle the document chat. */
+  openChat: (open?: boolean) => void
+  /** Ask the document chat a question (opens the panel). */
+  askDocument: (question: string) => Promise<void>
+  clearChat: () => void
 }

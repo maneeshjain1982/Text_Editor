@@ -1,6 +1,6 @@
 # Integration Guide
 
-This guide explains how to add `@local/rich-editor` to an existing Vue 3 front end: installing it, placing it on a page, saving and loading content, uploading images, matching your design, and exporting to Word.
+This guide explains how to add `@local/rich-editor` to an existing Vue 3 front end: installing it, placing it on a page, saving and loading content, uploading images, matching your design, exporting to Word, and connecting the AI Canvas to Gemini.
 
 For the complete list of props, events and methods, see the [API reference](../packages/editor/README.md).
 
@@ -14,11 +14,12 @@ For the complete list of props, events and methods, see the [API reference](../p
 6. [Image uploads](#6-image-uploads)
 7. [Match your dashboard's design](#7-match-your-dashboards-design)
 8. [Word export and import](#8-word-export-and-import)
-9. [Common scenarios](#9-common-scenarios)
-10. [Security](#10-security)
-11. [Updating the package](#11-updating-the-package)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Integration checklist](#13-integration-checklist)
+9. [AI Canvas with Gemini](#9-ai-canvas-with-gemini)
+10. [Common scenarios](#10-common-scenarios)
+11. [Security](#11-security)
+12. [Updating the package](#12-updating-the-package)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Integration checklist](#14-integration-checklist)
 
 ---
 
@@ -145,7 +146,7 @@ The editor fills whatever space it is given. Choose one approach:
 <RichEditor v-model="content" height="auto" />
 ```
 
-If the editor appears collapsed or has no scrollbar, its parent probably has no height. See [Troubleshooting](#12-troubleshooting).
+If the editor appears collapsed or has no scrollbar, its parent probably has no height. See [Troubleshooting](#13-troubleshooting).
 
 ### 4.4 Choose the toolbar
 
@@ -536,7 +537,136 @@ async function downloadFromList(documentId: string) {
 - **Images:** store images on a CORS-enabled host (see [section 6](#6-image-uploads)) so export can embed them.
 - **Imported files:** importing .docx keeps structure, lists, tables, images, links and bold/italic/underline, but not font colors or sizes.
 
-## 9. Common scenarios
+## 9. AI Canvas with Gemini
+
+The AI Canvas lets users generate a draft, then change only the part they point at, instead of regenerating everything. Every AI change appears as a suggestion to accept or reject. See [AI Canvas in the API reference](../packages/editor/README.md#ai-canvas) for the full feature list.
+
+It is optional: without the `ai` prop, no AI controls appear and no AI code runs.
+
+### 9.1 How the pieces connect
+
+```
+RichEditor ──(createHttpAiAdapter)──▶ /api/ai/complete on your domain
+                                          │ reverse proxy / API gateway
+                                          ▼
+                              AI server (examples/ai-server)
+                              gemini.config.ts + GEMINI_API_KEY
+                                          │
+                                          ▼
+                                    Google Gemini
+```
+
+**The Gemini API key must never reach the browser.** The editor only talks to your backend, and your backend calls Gemini.
+
+### 9.2 Set up the server
+
+Use the reference server in [`examples/ai-server`](../examples/ai-server/README.md), or port it to your backend.
+
+```bash
+cd examples/ai-server
+npm install
+cp .env.example .env        # then set GEMINI_API_KEY (from https://aistudio.google.com/apikey)
+npm start                   # http://localhost:8787/api/ai
+```
+
+Models, thinking levels, limits, safety and house style are all set in **one file**, [`gemini.config.ts`](../examples/ai-server/gemini.config.ts). The default model is `gemini-3.8-flash`, with `gemini-3.5-flash-lite` as a fallback. For Google Cloud, set `provider: 'vertex-ai'` and `GOOGLE_CLOUD_PROJECT`.
+
+`npm run mock` runs the same server without calling Gemini, which is useful for front-end development and CI.
+
+### 9.3 Route `/api/ai` to the server
+
+Keep the endpoint on your dashboard's own domain, so there's no CORS and your session cookies work.
+
+**Development (Vite):**
+
+```ts
+// vite.config.ts
+const aiServer = { '/api/ai': { target: 'http://localhost:8787', changeOrigin: true } }
+export default defineConfig({
+  server: { proxy: aiServer },
+  preview: { proxy: aiServer },
+})
+```
+
+**Production:** add a route in your reverse proxy or API gateway. Streaming must not be buffered. For nginx:
+
+```nginx
+location /api/ai/ {
+  proxy_pass http://ai-server:8787;
+  proxy_buffering off;        # needed for live streaming
+  proxy_read_timeout 120s;
+}
+```
+
+### 9.4 Turn it on in the editor
+
+```ts
+// src/api/ai.ts
+import { createHttpAiAdapter } from '@local/rich-editor'
+
+export const aiAdapter = createHttpAiAdapter({
+  url: '/api/ai/complete',
+  // Send your dashboard's auth if the endpoint needs it:
+  headers: () => ({ Authorization: `Bearer ${auth.token}` }),
+})
+```
+
+```vue
+<RichEditor v-model="content" :ai="aiAdapter" @error="onEditorError" />
+```
+
+The **AI** menu appears in the toolbar, an **Ask AI** menu appears under selected text, and **Ctrl+J** opens the AI bar.
+
+To show AI only to some users, pass the adapter conditionally, e.g. `:ai="canUseAi ? aiAdapter : undefined"`. This can change at any time.
+
+### 9.5 Optional: logging, versions, custom actions
+
+```vue
+<RichEditor
+  v-model="content"
+  :ai="aiAdapter"
+  :ai-actions="[...DEFAULT_AI_ACTIONS, { id: 'exec', label: 'Executive summary', instruction: 'Rewrite as a three-bullet executive summary.' }]"
+  @ai-request="(r) => analytics.track('ai_request', { task: r.task })"
+  @ai-applied="(e) => analytics.track('ai_applied', e)"
+  @version-created="(v) => api.post(`/documents/${id}/versions`, v)"
+/>
+```
+
+- **Versions** are kept in memory (30 by default, `max-versions`). Save them through `version-created` if they should outlive the page.
+- **Pending suggestions are not saved.** `v-model`, autosave and exports only contain accepted content, so your save logic doesn't change.
+
+### 9.6 Chat with the document
+
+The chat is on whenever `ai` is set (turn it off with `:features="{ chat: false }"`). To keep conversations per document, bind the history and save it with the document:
+
+```vue
+<RichEditor
+  v-model="content"
+  :ai="aiAdapter"
+  v-model:chat-history="chatHistory"
+/>
+```
+
+```ts
+// load with the document
+chatHistory.value = doc.chatHistory ?? []
+// save: watch it, or save it together with the document
+watch(chatHistory, (h) => api.put(`/documents/${id}/chat`, h))
+```
+
+Each question sends the **whole document** (up to about 150,000 characters), so check that this fits your data policy. Set `tasks.chat` in `gemini.config.ts` to change the model settings for chat.
+
+### 9.7 Another backend or model
+
+The editor doesn't depend on Gemini. For a Java, .NET or Python backend, implement the same endpoint:
+
+1. Accept the JSON `AiRequest` (`task`, `instruction`, `selection`, `context`, `blocks`, and `messages` for chat). For `chat`, send `prompt.history` as conversation turns before `prompt.user`.
+2. Build the prompt server-side. The templates are in `packages/editor/src/ai/prompts.ts`, or call `buildPrompt()` from `@local/rich-editor/ai` in Node.
+3. Stream NDJSON lines: `{"type":"chunk","text":"…"}`, then `{"type":"done"}` or `{"type":"error","message":"…"}`.
+
+The full protocol is in the [AI server README](../examples/ai-server/README.md#4-api). Alternatively, write your own adapter: `{ complete(request, { signal, onChunk }) => Promise<string> }`.
+
+## 10. Common scenarios
 
 ### Showing saved content without editing
 
@@ -546,7 +676,7 @@ The simplest option is a read-only editor, which gives identical rendering with 
 <RichEditor :model-value="doc.html" :editable="false" height="auto" :features="{ statusBar: false }" />
 ```
 
-For a lighter page, such as a list with previews, render the HTML with the editor's content styles. **Sanitise it first** (see [section 10](#10-security)):
+For a lighter page, such as a list with previews, render the HTML with the editor's content styles. **Sanitise it first** (see [section 10](#11-security)):
 
 ```vue
 <article class="re-export re-content" v-html="safeHtml" />
@@ -572,7 +702,7 @@ Each `<RichEditor>` is independent. Give each its own `v-model`, and its own `au
 </el-dialog>
 ```
 
-Render the editor only while the dialog is open (`destroy-on-close` or `v-if`). If your dialog library traps focus, see [Troubleshooting](#12-troubleshooting).
+Render the editor only while the dialog is open (`destroy-on-close` or `v-if`). If your dialog library traps focus, see [Troubleshooting](#13-troubleshooting).
 
 ### Adding your own buttons to the toolbar area
 
@@ -619,7 +749,7 @@ Import `@tiptap/*` packages at the same version the editor uses (`npm ls @tiptap
 
 Add the stylesheet in `nuxt.config.ts`: `css: ['@local/rich-editor/styles.css']`.
 
-## 10. Security
+## 11. Security
 
 The editor's schema only keeps elements and attributes it recognises, so pasted or imported scripts never enter the editor. **Your backend still receives HTML from the browser, and a user can send anything to your API.** Follow these rules:
 
@@ -634,8 +764,14 @@ The editor's schema only keeps elements and attributes it recognises, so pasted 
    ```
 3. **Content Security Policy:** the editor needs `img-src data: blob:` (previews and embedded images) plus your image host, and `style-src 'unsafe-inline'` (formatting is stored as inline styles). It doesn't need `unsafe-eval`.
 4. **Uploads:** check type and size on the server, and serve uploaded files from a separate domain or with `Content-Disposition` and `X-Content-Type-Options: nosniff`. SVG files can contain scripts, so sanitise SVGs or reject them on the server.
+5. **AI Canvas:**
+   - Keep the Gemini key on the server.
+   - Require your dashboard's authentication on `/api/ai`, and rate-limit it per user; every request costs tokens.
+   - Leave `trustClientPrompt: false`, so the server builds the prompts.
+   - Model output goes through the editor schema and is always shown as a suggestion before it's applied.
+   - Selected text is sent to Google, so confirm your data policy allows that. Vertex AI offers enterprise data controls.
 
-## 11. Updating the package
+## 12. Updating the package
 
 1. In the editor repository: update the version, then run `npm run build && npm run pack`.
 2. In your app: replace the tarball and reinstall.
@@ -650,7 +786,7 @@ The editor's schema only keeps elements and attributes it recognises, so pasted 
 
 Stored content does not need migrating between versions. The HTML and JSON formats are stable.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
@@ -668,9 +804,12 @@ Stored content does not need migrating between versions. The HTML and JSON forma
 | "Unsaved changes" warning right after loading | The editor normalises HTML on load. Compare against `getHTML()` from the `ready` event (section 5.2). |
 | Content changes after load don't show | Replace the whole value (`content.value = newHtml`) rather than changing it in place, or call `editorRef.value.setContent()`. |
 | Changing `features` or `extensions` has no effect | These are read when the editor mounts. Change the component's `:key` to remount it. |
+| AI bar shows "The AI request failed" | The endpoint isn't reachable or returned an error. Check `GET /api/ai/health`, the proxy route, and the AI server log. |
+| AI text appears all at once instead of streaming | A proxy is buffering the response. Turn buffering off for `/api/ai` (e.g. nginx `proxy_buffering off`). |
+| "Unsaved changes" right after loading a document that ends in a table | Fixed in the editor: the trailing empty paragraph is now added at load. Update the package. |
 | Ctrl+F opens the browser's search | Ctrl+F opens the editor's find bar only when focus is inside the editor. |
 
-## 13. Integration checklist
+## 14. Integration checklist
 
 - [ ] Vue 3.3+, a bundler that supports `exports`, and a compatible TypeScript `moduleResolution`
 - [ ] Package installed from the `.tgz`; `npm ls vue` shows a single copy
@@ -686,3 +825,4 @@ Stored content does not need migrating between versions. The HTML and JSON forma
 - [ ] Toolbar and `features` match the page's purpose; `editable` follows permissions
 - [ ] Word export tried with a real document and opened in Word
 - [ ] Tested at your smallest supported screen width
+- [ ] AI Canvas (if used): Gemini key only on the server; `/api/ai` routed on your domain with buffering off; endpoint requires your auth; per-user rate limits; data policy allows sending document text to Google

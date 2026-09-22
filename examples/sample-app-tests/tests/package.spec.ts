@@ -110,3 +110,20 @@ test.describe('installed package', () => {
     expect(xml).toMatch(/<w:pgSz w:w="12240" w:h="15840"/)
   })
 })
+
+test.describe('installed package: AI entry', () => {
+  test('“/ai” works in Node without Vue or a DOM (for backends)', async () => {
+    const aiEntry = pkg().exports['./ai'].import as string
+    const source = readFileSync(path.join(EDITOR_PKG_DIR, aiEntry), 'utf8')
+    expect(source).not.toMatch(/from "(vue|@tiptap)/)
+    const ai = await import(pathToFileURL(path.join(EDITOR_PKG_DIR, aiEntry)).href)
+    const prompt = ai.buildPrompt({ task: 'edit-selection', instruction: 'Shorter', selection: 'Hello there.' }, 'House style.')
+    expect(prompt.system).toContain('House style.')
+    expect(prompt.user).toContain('<selection>Hello there.</selection>')
+    const out = await ai.createDemoAiAdapter({ delayMs: 0 }).complete(
+      { task: 'edit-selection', instruction: 'shorter', selection: 'One. Two.', responseFormat: 'markdown', prompt },
+      { signal: new AbortController().signal, onChunk: () => {} },
+    )
+    expect(out).toBe('One.')
+  })
+})

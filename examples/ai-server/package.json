@@ -1,0 +1,25 @@
+{
+  "name": "rich-editor-ai-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reference Gemini backend for the Rich Editor AI Canvas.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.ts",
+    "dev": "node --env-file-if-exists=.env --watch server.ts",
+    "mock": "node server.ts --mock",
+    "editor:update": "npm install @local/rich-editor@file:../../packages/editor/local-rich-editor-0.1.0.tgz",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "2.24.0",
+    "@local/rich-editor": "file:../../packages/editor/local-rich-editor-0.1.0.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.0",
+    "typescript": "~5.9.3"
+  }
+}

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import { buildExtensions } from '../src/extensions'
 import { cleanPastedHTML } from '../src/extensions/PasteCleanup'
-import { normalizeContent } from '../src/services/content'
+import { ensureTrailingParagraph, normalizeContent } from '../src/services/content'
 import { DEFAULT_FEATURES } from '../src/defaults'
 import { toHtmlDocument, toMarkdown } from '../src/services/exporters'
 import { extractHtmlBody, textToHtml } from '../src/services/importers'
@@ -107,6 +107,18 @@ describe('empty JSON documents', () => {
     expect(e.state.storedMarks?.map((m) => m.type.name)).toEqual(['bold'])
     e.commands.insertContent('bold text')
     expect(e.getHTML()).toBe('<p><strong>bold text</strong></p>')
+  })
+})
+
+describe('trailing paragraph', () => {
+  it('is added at load time, not on the first click, and not as an undo step', () => {
+    const e = createEditor('<p>Intro</p><table><tbody><tr><td><p>cell</p></td></tr></tbody></table>')
+    ensureTrailingParagraph(e)
+    expect(e.state.doc.lastChild?.type.name).toBe('paragraph')
+    const loaded = JSON.stringify(e.getJSON())
+    e.commands.setTextSelection(2) // a click
+    expect(JSON.stringify(e.getJSON())).toBe(loaded)
+    expect(e.can().undo()).toBe(false)
   })
 })
 

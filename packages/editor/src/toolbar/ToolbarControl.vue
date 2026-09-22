@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  Baseline, Download, FilePlus, FileText, FolderOpen, Highlighter, Image as ImageIcon, Link, Omega,
+  ArrowRight, Baseline, Download, FilePlus, FileText, FolderOpen, Highlighter, History, Image as ImageIcon, Link, MessagesSquare, Omega, PenLine, Sparkles,
   Table as TableIcon, TextAlignCenter, TextAlignEnd, TextAlignJustify, TextAlignStart, UnfoldVertical,
 } from 'lucide-vue-next'
 import { useEditorContext } from '../context'
@@ -125,6 +125,32 @@ function insertTable({ rows, cols }: { rows: number; cols: number }) {
   open.value = false
 }
 
+// ---- AI ----------------------------------------------------------------------
+type AiMenuAction = 'ask' | 'generate' | 'continue' | 'document' | 'chat' | 'versions'
+const aiOptions = computed<MenuOption<AiMenuAction>[]>(() => {
+  void editor.value?.state
+  const hasSelection = !!editor.value && !editor.value.state.selection.empty
+  return [
+    { value: 'ask', label: t('aiAsk'), icon: Sparkles, disabled: !hasSelection, hint: hasSelection ? undefined : t('aiSelectionRequired') },
+    { value: 'generate', label: t('aiGenerate'), icon: PenLine },
+    { value: 'continue', label: t('aiContinue'), icon: ArrowRight },
+    { value: 'document', label: t('aiEditDocument'), icon: FileText },
+    ...(ctx.chat.value ? [{ value: 'chat' as const, label: t('chatTitle'), icon: MessagesSquare, hint: 'Ctrl+Alt+J' }] : []),
+    { value: 'versions', label: t('aiVersions'), icon: History, separatorBefore: true },
+  ]
+})
+function onAiAction(action: AiMenuAction) {
+  open.value = false
+  const ai = ctx.ai.value
+  if (!ai) return
+  if (action === 'versions') ctx.openDialog('versions')
+  else if (action === 'chat') ctx.chat.value?.setOpen(true)
+  else if (action === 'ask') ai.open('edit-selection')
+  else if (action === 'generate') ai.open('generate')
+  else if (action === 'document') ai.open('edit-document')
+  else if (ai.open('continue')) void ai.run('', t('aiContinue'))
+}
+
 // ---- file --------------------------------------------------------------------
 type FileAction = 'new' | 'open' | ExportFormat
 const fileOptions = computed<MenuOption<FileAction>[]>(() => [
@@ -236,6 +262,13 @@ function onFilePicked(e: Event) {
       <ToolButton :icon="TableIcon" :label="t('table')" has-menu :expanded="open" :active="editor?.isActive('table')" @click="toggle" />
     </template>
     <TableGridPicker @select="insertTable" />
+  </Popover>
+
+  <Popover v-else-if="item === 'ai'" v-model:open="open" :label="t('ai')">
+    <template #trigger="{ toggle }">
+      <ToolButton :icon="Sparkles" :label="t('ai')" show-label has-menu :expanded="open" class="re-ai-trigger" @click="toggle" />
+    </template>
+    <MenuList :options="aiOptions" :label="t('ai')" @select="onAiAction" />
   </Popover>
 
   <ToolButton v-else-if="item === 'specialChars'" :icon="Omega" :label="t('specialChars')" @click="ctx.openDialog('specialChars')" />

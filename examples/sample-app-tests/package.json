@@ -8,7 +8,7 @@
     "test": "playwright test",
     "test:package": "playwright test --project=package",
     "test:app": "playwright test --project=app",
-    "validate": "npm --prefix ../sample-app run editor:update && npm test"
+    "validate": "npm --prefix ../sample-app run editor:update && npm --prefix ../ai-server run editor:update && npm test"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

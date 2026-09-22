@@ -114,3 +114,22 @@ cd <dashboard> && npm i <path>/local-rich-editor-x.y.z.tgz
 # Option B – linked path
 npm i file:<path>/Editor/packages/editor
 ```
+
+---
+
+## AI Canvas (added 2026-09-22)
+
+Like Gemini Canvas: generate once, then change only what you point at. Decisions: **Gemini** as the model (through a backend; key never in the browser), AI changes always **reviewed as suggestions**, phases 1–5 in scope.
+
+| Phase | Status |
+|---|---|
+| 1. Adapter API (`ai` prop, `AiAdapter`), lazy parsers, demo adapter | ✅ |
+| 2. Edit selection: Ask AI, quick actions, streaming, inline suggestions with accept/reject/retry/refine, Stop | ✅ |
+| 3. Generate (empty document or after the current block) and continue writing | ✅ |
+| 4. Whole-document edits with block patches (only changed blocks), accept/reject all | ✅ |
+| 5. Version history (snapshot before each accepted change, restore) | ✅ |
+| 6. Chat with the document: side panel, cited answers with source links, follow-ups, selection context, edits as suggestions, insert/replace answers, history via v-model, long-document handling | ✅ (2026-09-22) |
+| Gemini server (`examples/ai-server`, one config file `gemini.config.ts`, mock mode) | ✅ |
+| Docs, sample app integration, tests (unit, playground E2E, package validation) | ✅ |
+
+Open: test against live Gemini with a real API key (development used mock mode and the demo adapter).

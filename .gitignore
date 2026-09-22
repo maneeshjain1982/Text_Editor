@@ -4,4 +4,7 @@ dist
 .DS_Store
 *.log
 test-results
+.env
+.env.*
+!.env.example
 playwright-report

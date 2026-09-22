@@ -1,4 +1,4 @@
-import type { JSONContent } from '@tiptap/core'
+import type { Editor, JSONContent } from '@tiptap/core'
 import type { EditorContent } from '../types'
 
 /**
@@ -16,4 +16,18 @@ export function normalizeContent(value: EditorContent | null | undefined): Edito
     return { ...value, content: [{ type: 'paragraph' }] } satisfies JSONContent
   }
   return value
+}
+
+/**
+ * StarterKit's TrailingNode adds an empty paragraph after a document that ends in a
+ * table, image, list etc. — but lazily, on the first transaction. A freshly loaded
+ * document would then change as soon as the user clicks it, which hosts see as
+ * "unsaved changes". Apply it right after content is loaded instead (outside undo history).
+ */
+export function ensureTrailingParagraph(editor: Editor) {
+  const { doc, schema, tr } = editor.state
+  const last = doc.lastChild
+  const paragraph = schema.nodes.paragraph
+  if (!last || !paragraph || last.type === paragraph) return
+  editor.view.dispatch(tr.insert(doc.content.size, paragraph.create()).setMeta('addToHistory', false))
 }

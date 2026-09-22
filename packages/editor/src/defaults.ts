@@ -9,4 +9,7 @@ export const DEFAULT_FEATURES: Required<EditorFeatures> = {
   codeHighlight: true,
   docx: true,
   statusBar: true,
+  // On by default, but only takes effect when an `ai` adapter is passed.
+  ai: true,
+  chat: true,
 }

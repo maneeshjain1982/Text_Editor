@@ -304,7 +304,7 @@
   <header class="intro">
     <div class="eyebrow">@local/rich-editor · v0.1.0</div>
     <h1>Integrating the Rich Editor into your front end</h1>
-    <p class="lede">Twelve steps, from building the package to a release check. Each step says where the code goes and how to confirm it worked.</p>
+    <p class="lede">Thirteen steps, from building the package to a release check. Each step says where the code goes and how to confirm it worked.</p>
     <div class="reqs" aria-label="Requirements">
       <span class="req"><b>Vue</b> 3.3 or later</span>
       <span class="req"><b>Bundler</b> Vite or webpack 5</span>
@@ -327,8 +327,9 @@
         <li><a href="#s8">Match your design</a></li>
         <li><a href="#s9">Configure the page</a></li>
         <li><a href="#s10">Word export</a></li>
-        <li><a href="#s11">Secure the content</a></li>
-        <li><a href="#s12">Test before release</a></li>
+        <li><a href="#s11">Add the AI Canvas</a></li>
+        <li><a href="#s12">Secure the content</a></li>
+        <li><a href="#s13">Test before release</a></li>
       </ol>
     </nav>
 
@@ -542,6 +543,43 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
       <article class="step" id="s11">
         <div class="num" aria-hidden="true">11</div>
         <div class="step-body">
+          <h2>Add the AI Canvas with Gemini <span class="tag">optional</span></h2>
+          <p>Users generate a draft, then change only the part they point at. Every AI change is a suggestion to accept or reject. The Gemini key stays on a server; the editor only calls your own <code>/api/ai</code> endpoint.</p>
+          <div class="where">examples/ai-server (settings in one file: gemini.config.ts)</div>
+          <div class="code">
+            <div class="code-head"><span>terminal · AI server</span><button class="copy" type="button">Copy</button></div>
+<pre>cd examples/ai-server
+npm install
+cp .env.example .env   <span class="c"># set GEMINI_API_KEY</span>
+npm start              <span class="c"># or: npm run mock (no key, demo answers)</span></pre>
+          </div>
+          <div class="code">
+            <div class="code-head"><span>vite.config.ts · route /api/ai to the server</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">const</span> aiServer = { <span class="s">'/api/ai'</span>: { target: <span class="s">'http://localhost:8787'</span>, changeOrigin: <span class="k">true</span> } }
+<span class="k">export default</span> defineConfig({ server: { proxy: aiServer }, preview: { proxy: aiServer } })</pre>
+          </div>
+          <div class="code">
+            <div class="code-head"><span>DocumentEdit.vue</span><button class="copy" type="button">Copy</button></div>
+<pre><span class="k">import</span> { RichEditor, createHttpAiAdapter } <span class="k">from</span> <span class="s">'@local/rich-editor'</span>
+
+<span class="k">const</span> aiAdapter = createHttpAiAdapter({ url: <span class="s">'/api/ai/complete'</span> })
+
+<span class="c">// template</span>
+&lt;RichEditor v-model="content" :ai="aiAdapter" @error="onError" /&gt;</pre>
+          </div>
+          <ul>
+            <li>An <b>AI</b> menu appears in the toolbar, <b>Ask AI</b> under selected text, and <b>Ctrl+J</b> opens the AI bar.</li>
+            <li><b>Chat with the document</b> (toolbar button or Ctrl+Alt+J): answers link to their sources, and requested changes appear as suggestions. Bind <code>v-model:chat-history</code> to keep the conversation per document.</li>
+            <li>Pending suggestions aren’t in <code>v-model</code>, so your save logic doesn’t change.</li>
+            <li>In production, route <code>/api/ai</code> through your reverse proxy with buffering off, and require your dashboard’s login on it.</li>
+          </ul>
+          <div class="check"><code>GET /api/ai/health</code> returns <code>"ok":true</code>, and selecting text then choosing <b>Make shorter</b> shows a suggestion.</div>
+        </div>
+      </article>
+
+      <article class="step" id="s12">
+        <div class="num" aria-hidden="true">12</div>
+        <div class="step-body">
           <h2>Secure the content</h2>
           <p>The editor strips unknown markup, but your API can still receive anything a user sends.</p>
           <ul>
@@ -560,8 +598,8 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
         </div>
       </article>
 
-      <article class="step" id="s12">
-        <div class="num" aria-hidden="true">12</div>
+      <article class="step" id="s13">
+        <div class="num" aria-hidden="true">13</div>
         <div class="step-body">
           <h2>Test before release</h2>
           <p>Work through the checklist below on a real page of your app. Your ticks are kept in this browser.</p>
@@ -570,7 +608,7 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
 
       <section class="panel" id="checklist" aria-labelledby="checklist-title">
         <h2 id="checklist-title">Release checklist</h2>
-        <div class="progress" id="progress" aria-live="polite">0 of 8 done</div>
+        <div class="progress" id="progress" aria-live="polite">0 of 9 done</div>
         <ul class="checklist">
           <li><label><input type="checkbox" id="c1"><span>The editor shows its styles, toolbar and a scrollbar</span></label></li>
           <li><label><input type="checkbox" id="c2"><span>Content saves and reloads unchanged</span></label></li>
@@ -580,6 +618,7 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
           <li><label><input type="checkbox" id="c6"><span>Brand colors and dark mode apply, including in dropdowns</span></label></li>
           <li><label><input type="checkbox" id="c7"><span>An exported .docx opens correctly in Word, with images</span></label></li>
           <li><label><input type="checkbox" id="c8"><span>The page works at your smallest supported screen width</span></label></li>
+          <li><label><input type="checkbox" id="c9"><span>AI (if used): the key is only on the server, <code>/api/ai</code> requires login, and a suggestion appears for a real Gemini request</span></label></li>
         </ul>
       </section>
 
@@ -597,7 +636,7 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
               <tr><td>Brand colors missing in dropdowns</td><td>Add <code>.re-portal</code> to your variable selector (step 8).</td></tr>
               <tr><td>Images missing from the Word file</td><td>The image host blocks CORS. Allow your app’s origin (step 7).</td></tr>
               <tr><td>First Word export reloads the page in development</td><td>Add <code>optimizeDeps: { include: ['docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'] }</code> to <code>vite.config.ts</code>.</td></tr>
-              <tr><td>Changing <code>features</code> does nothing</td><td>Change the component’s <code>:key</code> to remount it.</td></tr>
+              <tr><td>AI bar says <td>Change the component’s <code>:key</code> to remount it.</td></tr>
             </tbody>
           </table>
         </div>

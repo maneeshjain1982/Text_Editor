@@ -79,8 +79,27 @@ npm run preview    # serves dist/ at http://localhost:4173
 | Switch the whole app, editor included, to dark mode | **Dark mode** in the header |
 | Add the app's custom closing line | **Insert sign-off** above the page |
 | Simulate a failed image upload | Insert an image whose file name starts with `fail-` |
+| **AI Canvas:** select text, then **Ask AI** or a quick action; accept or reject the suggestion | Edit page (needs the AI server, see below) |
+| Generate a draft, continue writing, or edit the whole document | **AI** menu in the toolbar, or Ctrl+J |
+| Undo an accepted AI change, or restore an earlier version | Ctrl+Z · **AI → Version history** |
+| **Chat with the document:** ask a question, click a source number, ask for a change | **Chat** button in the toolbar, or Ctrl+Alt+J. The chat is kept per document across reloads. |
 
 Documents are saved in the browser's `localStorage` by a mock API, so they stay after a reload. To reset, run `localStorage.clear()` in the browser console.
+
+### Run with AI (Gemini)
+
+The AI Canvas needs the Gemini server from [`examples/ai-server`](../ai-server/README.md). Start it in a second terminal; the sample app forwards `/api/ai` to it.
+
+```bash
+cd examples/ai-server
+npm install
+cp .env.example .env     # set GEMINI_API_KEY
+npm start                # real Gemini
+# or
+npm run mock             # no key needed: deterministic demo answers
+```
+
+Without the server, the app still works; AI requests just show "The AI request failed".
 
 ## 3. Update the app after editor changes
 
@@ -136,9 +155,12 @@ Two helper scripts keep it up to date:
 **File:** [`vite.config.ts`](vite.config.ts)
 
 ```ts
+const aiServer = { '/api/ai': { target: process.env.AI_SERVER_URL ?? 'http://localhost:8787', changeOrigin: true } }
+
 export default defineConfig({
   plugins: [vue()],
-  server: { port: 5174, strictPort: true },
+  server: { port: 5174, strictPort: true, proxy: aiServer },
+  preview: { proxy: aiServer },
   optimizeDeps: {
     include: ['@local/rich-editor/docx', 'docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'],
   },
@@ -146,6 +168,7 @@ export default defineConfig({
 ```
 
 - No alias to the editor source is needed; Vite resolves `@local/rich-editor` from `node_modules`.
+- `proxy` forwards `/api/ai` to the Gemini server (step 12), so the browser only calls its own origin.
 - `optimizeDeps.include` pre-bundles what is loaded on demand: the editor's `/docx` entry, used when exporting from the list, and the libraries behind export and import. Without it, the first Word export in development reloads the page. Production builds don't need it.
 
 ### Step 3: Import the styles once
@@ -358,7 +381,7 @@ function insertSignature() {
 
 `editorRef.value.editor` is the TipTap editor instance, so any TipTap command works.
 
-**Guide:** [§9 Common scenarios](../../docs/INTEGRATION.md#9-common-scenarios)
+**Guide:** [§10 Common scenarios](../../docs/INTEGRATION.md#10-common-scenarios)
 
 ### Step 10: Export to Word
 
@@ -401,7 +424,39 @@ The headless `/docx` entry takes the stored JSON, which is why step 5 uses `cont
 
 Content renders exactly as it does in the editor, with no toolbar, no status bar, and a height that grows with the document.
 
-**Guide:** [§9 Common scenarios → Showing saved content](../../docs/INTEGRATION.md#showing-saved-content-without-editing)
+**Guide:** [§10 Common scenarios → Showing saved content](../../docs/INTEGRATION.md#showing-saved-content-without-editing)
+
+### Step 12: Add the AI Canvas (Gemini)
+
+**Files:** [`src/api/ai.ts`](src/api/ai.ts), [`src/views/DocumentEdit.vue`](src/views/DocumentEdit.vue), [`vite.config.ts`](vite.config.ts), and the server in [`../ai-server`](../ai-server/README.md)
+
+```ts
+// src/api/ai.ts
+import { createHttpAiAdapter } from '@local/rich-editor'
+
+export const aiAdapter = createHttpAiAdapter({
+  url: '/api/ai/complete',
+  // headers: () => ({ Authorization: `Bearer ${auth.token}` }),
+})
+```
+
+```vue
+<!-- DocumentEdit.vue -->
+<RichEditor v-model="content" :ai="aiAdapter" @error="onEditorError" … />
+```
+
+- **Browser:** calls `/api/ai/complete` on its own origin.
+- **Vite:** forwards the request to the AI server (step 2).
+- **AI server:** calls Gemini with the settings in [`gemini.config.ts`](../ai-server/gemini.config.ts). The API key lives only in the server's `.env`.
+- **`onEditorError`:** already handles `type: 'ai'` errors, like the other editor errors.
+- **Saving:** AI suggestions don't change `content` until accepted, so the save logic and the "Unsaved changes" indicator need no AI-specific code.
+- **Chat history:** `v-model:chat-history` is saved per document (in `localStorage` here; in your app, through your API), so the conversation comes back after a reload:
+
+```vue
+<RichEditor … :chat-history="chatHistory" @update:chat-history="saveChat" />
+```
+
+**Guide:** [§9 AI Canvas with Gemini](../../docs/INTEGRATION.md#9-ai-canvas-with-gemini)
 
 ### Integration summary
 
@@ -418,6 +473,7 @@ Content renders exactly as it does in the editor, with no toolbar, no status bar
 | Custom slot button | `src/views/DocumentEdit.vue` |
 | Word export (component and headless) | `src/views/DocumentEdit.vue`, `src/views/DocumentList.vue` |
 | Read-only view | `src/views/DocumentView.vue` |
+| AI Canvas (Gemini) | `src/api/ai.ts`, `src/views/DocumentEdit.vue`, `vite.config.ts` proxy, `../ai-server` |
 
 ---
 
@@ -434,6 +490,7 @@ sample-app/
    ├─ router.ts              list / new / edit / view routes (editor pages lazy-loaded)
    ├─ App.vue                header with navigation and dark mode toggle
    ├─ api/documents.ts       mock API: list, get, save, remove, uploadImage (localStorage)
+   ├─ api/ai.ts              AI Canvas adapter → /api/ai/complete (proxied to the Gemini server)
    ├─ composables/useTheme.ts  shared light/dark state
    ├─ views/
    │  ├─ DocumentList.vue    table of documents, headless .docx export
@@ -454,4 +511,6 @@ sample-app/
 | Editor changes don't show up | Run `npm run editor:update`, delete `node_modules/.vite`, and restart `npm run dev`. |
 | Editor has no styles | Check that `src/main.ts` imports `@local/rich-editor/styles.css`. |
 | The first Word export reloads the page in dev | Check the `optimizeDeps.include` list in `vite.config.ts`. |
+| AI bar shows "The AI request failed" | The AI server isn't running. Start it in `examples/ai-server` (`npm start`, or `npm run mock` without a key). |
+| AI server exits with "Set GEMINI_API_KEY" | Copy `.env.example` to `.env` in `examples/ai-server` and add your key. |
 | Old documents appear after testing | Run `localStorage.clear()` in the browser console and reload. |

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import {
   RichEditor,
+  type AiChatMessage,
   type EditorContent,
   type EditorError,
   type JSONContent,
@@ -10,6 +11,7 @@ import {
   type RichEditorExpose,
 } from '@local/rich-editor'
 import { documentsApi } from '../api/documents'
+import { aiAdapter } from '../api/ai'
 import { useTheme } from '../composables/useTheme'
 
 const route = useRoute()
@@ -88,6 +90,7 @@ function onEditorError(error: EditorError) {
     import: 'That file could not be opened.',
     export: 'Export failed.',
     clipboard: 'Clipboard access was blocked.',
+    ai: error.message || 'The AI request failed.',
   }
   notify('error', text[error.type])
 }
@@ -121,6 +124,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 onBeforeRouteLeave(() => !isDirty.value || window.confirm('You have unsaved changes. Leave anyway?'))
 
 const draftKey = computed(() => `docs-hub-draft-${id.value ?? 'new'}`)
+
+// Chat history per document (integration guide §9.5). Stored locally here; a real app would
+// save it through its API next to the document.
+const chatKey = computed(() => `docs-hub-chat-${id.value ?? 'new'}`)
+const chatHistory = ref<AiChatMessage[]>(readChat())
+function readChat(): AiChatMessage[] {
+  try {
+    return JSON.parse(localStorage.getItem(`docs-hub-chat-${(route.params.id as string | undefined) ?? 'new'}`) ?? '[]')
+  } catch {
+    return []
+  }
+}
+function saveChat(history: AiChatMessage[]) {
+  chatHistory.value = history
+  try {
+    localStorage.setItem(chatKey.value, JSON.stringify(history))
+  } catch {
+    /* storage full or unavailable */
+  }
+}
 </script>
 
 <template>
@@ -161,6 +184,9 @@ const draftKey = computed(() => `docs-hub-draft-${id.value ?? 'new'}`)
         :document-name="title || 'document'"
         :autosave-key="draftKey"
         :messages="messages"
+        :ai="aiAdapter"
+        :chat-history="chatHistory"
+        @update:chat-history="saveChat"
         placeholder="Start writing your document…"
         @ready="onReady"
         @error="onEditorError"

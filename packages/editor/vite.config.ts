@@ -28,6 +28,7 @@ export default defineConfig({
       entry: {
         'rich-editor': fileURLToPath(new URL('./src/index.ts', import.meta.url)),
         docx: fileURLToPath(new URL('./src/docx.ts', import.meta.url)),
+        ai: fileURLToPath(new URL('./src/ai.ts', import.meta.url)),
       },
       formats: ['es', 'cjs'],
       fileName: (format, entryName) => `${entryName}.${format === 'es' ? 'js' : 'cjs'}`,

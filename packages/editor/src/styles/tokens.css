@@ -40,6 +40,14 @@
   --re-shadow: 0 1px 2px rgba(15, 20, 25, 0.06), 0 8px 24px rgba(15, 20, 25, 0.12);
   --re-page-shadow: 0 1px 3px rgba(15, 20, 25, 0.1), 0 0 0 1px rgba(15, 20, 25, 0.04);
 
+  /* AI Canvas */
+  --re-ai-accent: #7c3aed;
+  --re-ai-accent-soft: rgba(124, 58, 237, 0.1);
+  --re-ai-added-bg: rgba(22, 163, 74, 0.1);
+  --re-ai-added-border: #16a34a;
+  --re-ai-removed-bg: rgba(220, 38, 38, 0.08);
+  --re-ai-removed-text: #b42318;
+
   --re-radius: 8px;
   --re-radius-sm: 6px;
   --re-page-width: 210mm; /* A4 */
@@ -76,4 +84,10 @@
   --re-match-current: rgba(249, 115, 22, 0.5);
   --re-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.45);
   --re-page-shadow: 0 0 0 1px #2b3038, 0 2px 8px rgba(0, 0, 0, 0.4);
+  --re-ai-accent: #a78bfa;
+  --re-ai-accent-soft: rgba(167, 139, 250, 0.16);
+  --re-ai-added-bg: rgba(74, 222, 128, 0.12);
+  --re-ai-added-border: #4ade80;
+  --re-ai-removed-bg: rgba(248, 113, 113, 0.12);
+  --re-ai-removed-text: #fca5a5;
 }

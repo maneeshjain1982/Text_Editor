@@ -27,11 +27,20 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    // Build (includes vue-tsc) then serve the production bundle, as a real deployment would.
-    command: 'npm --prefix ../sample-app run build && npm --prefix ../sample-app run preview',
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  webServer: [
+    {
+      // Gemini backend in mock mode: same server code and protocol, deterministic output, no API key.
+      command: 'npm --prefix ../ai-server run mock',
+      url: 'http://localhost:8787/api/ai/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      // Build (includes vue-tsc) then serve the production bundle, as a real deployment would.
+      command: 'npm --prefix ../sample-app run build && npm --prefix ../sample-app run preview',
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+  ],
 })

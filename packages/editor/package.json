@@ -13,6 +13,9 @@
     "*": {
       "docx": [
         "./dist/docx.d.ts"
+      ],
+      "ai": [
+        "./dist/ai.d.ts"
       ]
     }
   },
@@ -26,6 +29,11 @@
       "types": "./dist/docx.d.ts",
       "import": "./dist/docx.js",
       "require": "./dist/docx.cjs"
+    },
+    "./ai": {
+      "types": "./dist/ai.d.ts",
+      "import": "./dist/ai.js",
+      "require": "./dist/ai.cjs"
     },
     "./styles.css": "./dist/rich-editor.css"
   },

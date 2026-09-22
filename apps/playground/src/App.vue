@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import {
   RichEditor,
+  createDemoAiAdapter,
   type EditorContent,
   type EditorError,
   type EditorLayout,
@@ -19,6 +20,9 @@ const pageSize = ref<PageSize>('A4')
 const toolbarPreset = ref<'full' | 'basic' | 'custom'>('full')
 const editable = ref(true)
 const simulateUpload = ref(false)
+const aiEnabled = ref(true)
+// Offline demo AI; the sample app (examples/sample-app) uses a real Gemini backend.
+const demoAi = createDemoAiAdapter()
 const outputTab = ref<'html' | 'json'>('html')
 const log = ref<string[]>([])
 
@@ -96,6 +100,7 @@ function onError(error: EditorError) {
         </label>
         <label><input v-model="editable" type="checkbox" /> Editable</label>
         <label><input v-model="simulateUpload" type="checkbox" /> Simulate server upload</label>
+        <label><input v-model="aiEnabled" type="checkbox" data-testid="ai-toggle" /> AI Canvas (demo)</label>
       </div>
 
       <section class="pg-card pg-editor-card" :class="{ 'pg-inline': layout === 'inline' }">
@@ -108,6 +113,7 @@ function onError(error: EditorError) {
           :toolbar="toolbar"
           :editable="editable"
           :upload-image="simulateUpload ? uploadImage : undefined"
+          :ai="aiEnabled ? demoAi : undefined"
           :height="layout === 'inline' ? 420 : '100%'"
           document-name="quarterly-review"
           placeholder="Write your report…"
