@@ -174,7 +174,7 @@ test('editor follows the app’s dark mode and theme tokens', async ({ page }) =
   await expect(page.locator('.re-portal.re-popover')).toHaveClass(/re-theme-dark/)
 })
 
-test('AI Canvas: edits a selection through the app proxy and the Gemini server (mock mode)', async ({ page }) => {
+test('AI Canvas: edits a selection through the app proxy and the AI server (mock mode)', async ({ page }) => {
   const health = await page.request.get('/api/ai/health')
   expect(await health.json()).toMatchObject({ ok: true, mock: true })
 
@@ -219,7 +219,7 @@ test('AI Canvas: server validation errors are shown to the user', async ({ page 
   errors.splice(0, errors.length, ...errors.filter((e) => !e.includes('503')))
 })
 
-test('Chat with document: cited answer through the Gemini server (mock), history kept per document', async ({ page }) => {
+test('Chat with document: cited answer through the AI server (mock), history kept per document', async ({ page }) => {
   await page.getByTestId('row-welcome').getByRole('link', { name: 'Edit' }).click()
   await expect(editor(page)).toBeVisible()
   await toolbarButton(page, 'Chat with document').click()

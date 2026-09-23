@@ -89,14 +89,21 @@ Shortcuts: **Ctrl+Alt+1** to **Ctrl+Alt+6** for headings, **Ctrl+Alt+0** for nor
 - Press **Enter** twice to end a list.
 - In a checklist, click the box to tick an item.
 
-### Quotes, code and dividers
+### Quotes, code, dividers and page breaks
 
 | Element | Button | Shortcut | Or type |
 |---|---|---|---|
 | Quote | Quote button | Ctrl+Shift+B | `> ` |
 | Code block (with syntax colors) | Code block button | Ctrl+Alt+C | ` ``` ` |
 | Horizontal line | — button | – | – |
+| Page break | Page break button | Ctrl+Enter | – |
 | Special characters and emoji (©, →, €, ✓, 🙂) | Ω button | – | – |
+
+**Pages.** In page view the editor shows where each page ends, like Word: when a paragraph, table or image no longer fits, it moves to the next page and a grey gap labelled **Page 2**, **Page 3** and so on appears above it. You do not have to do anything for this; it updates as you type.
+
+A paragraph, table or image that is taller than a whole page keeps running across the gap. Word will split it when you download the file.
+
+**Page breaks.** To force a new page yourself, press **Ctrl+Enter** or use the **Page break** button. It appears as a dashed line labelled *Page break*, fills the rest of the current page and becomes a real page break in Word and when printing. To remove one, click it and press **Delete** or **Backspace**.
 
 ## 4. Links
 
@@ -159,16 +166,13 @@ Click an image to select it:
 4. To replace, type the new text and click **Replace** (current match) or **Replace all**.
 5. Press **Esc** to close the bar.
 
-## 8. Opening, saving and printing files
+## 8. Saving, downloading and printing
 
-Your document is normally saved by the application you're using (for example with its **Save** button). The **File** menu in the toolbar is for working with files on your computer:
+Your document is normally saved by the application you're using (for example with its **Save** button).
 
-| File menu item | What it does |
-|---|---|
-| **New document** | Starts an empty document (asks first if the current one has content) |
-| **Open…** | Opens a **Word (.docx)**, web page (.html), Markdown (.md), text (.txt) or JSON file, **replacing** the current content |
-| **Word document (.docx)** | Downloads the document as a Word file |
-| **Web page / Markdown / Plain text / JSON** | Downloads it in other formats |
+The toolbar has one file button, **Download as Word (.docx)**, which downloads the document you are editing as a Word file.
+
+Opening files from your computer, starting a new document and other formats (HTML, Markdown, text, JSON) are still supported by the editor, but they are actions your application decides to offer — for example the sample app's **Open file…** button. Ask your administrator if you need them.
 
 **Word files:**
 - **Downloading to Word** keeps headings, fonts, sizes, colors, highlights, lists, tables (including merged cells and cell colors), images with their size, alignment and captions, links, and the page size.
@@ -197,7 +201,7 @@ Suggestions aren't saved or exported until you accept them. If you edit the text
 1. Select a sentence, paragraph or table.
 2. A small menu appears under it. Choose:
    - **Ask AI** to type your own instruction (e.g. "make this friendlier" or "turn this into a table"), or
-   - **Quick actions** for a ready-made instruction: Improve writing, Fix spelling and grammar, Make shorter, Make longer, More formal, More casual, Simplify, Summarize, Turn into a list, Turn into a table, Translate to… (you add the language).
+   - **Quick actions** for a ready-made instruction: Improve writing, Make shorter, Make longer, More formal, Translate to Korean, Translate to English.
 3. The AI writes its answer (you can press **Stop** at any time), and the suggestion appears in the text.
 
 Only the selected text is rewritten; everything else stays exactly as it is.
@@ -215,8 +219,7 @@ In the purple AI bar above the page:
 | Action | What it does |
 |---|---|
 | **Generate content…** | Describe what you need ("a project update with a status table"). In an empty document it writes the whole draft; otherwise it adds the new content after the paragraph you're in. **Ctrl+J** with nothing selected does the same. |
-| **Continue writing** | Writes the next part from where your cursor is |
-| **Edit whole document…** | Applies an instruction to the whole document ("fix spelling everywhere", "make the tone more formal"). Only the paragraphs that need to change get suggestions, and you can **Accept all** or review them one by one. |
+| **Continue writing** and **Edit whole document** | Not in the menu. Your application can offer them as its own buttons; ask your administrator. |
 
 ### What the AI keeps and what it doesn't
 
@@ -288,6 +291,7 @@ On a Mac, use **⌘** instead of **Ctrl** and **⌥ (Option)** instead of **Alt*
 | Bulleted / numbered list / checklist | Ctrl+Shift+8 / 7 / 9 |
 | Indent / outdent | Ctrl+] / Ctrl+[ (in lists: Tab / Shift+Tab) |
 | Quote / Code block | Ctrl+Shift+B / Ctrl+Alt+C |
+| Page break | Ctrl+Enter |
 | Link | Ctrl+K |
 | Find and replace | Ctrl+F |
 | Paste as plain text | Ctrl+Shift+V |

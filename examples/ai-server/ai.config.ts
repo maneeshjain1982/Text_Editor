@@ -1,30 +1,59 @@
 /**
- * Gemini configuration for the Rich Editor AI Canvas.
+ * LLM configuration for the Rich Editor AI Canvas.
  *
- * This is the one file to edit to change models, limits and behaviour. Secrets are never
- * stored here: the API key is read from the environment (`.env`, see `.env.example`).
+ * This is the one file to edit to choose the provider, models, limits and behaviour.
+ * Secrets are never stored here: API keys are read from the environment (`.env`, see `.env.example`).
  *
- * Models (Gemini API, September 2026):
+ * Switch provider by changing `provider` below:
+ *   'gemini'  Google Gemini (AI Studio key or Vertex AI)          key: GEMINI_API_KEY
+ *   'openai'  ChatGPT / OpenAI, or anything OpenAI-compatible     key: OPENAI_API_KEY
+ *   'gauss'   Samsung Gauss through its OpenAI-compatible gateway key: GAUSS_API_KEY
+ *
+ * Gemini models (September 2026):
  *   gemini-3.8-flash       recommended default: fast, strong writing quality
  *   gemini-3.5-flash-lite  cheapest, lowest latency; good fallback for simple edits
  *   gemini-3.1-pro-preview highest quality, slower (preview)
- *   gemini-flash-latest    alias that always points at the newest Flash release
  * Check https://ai.google.dev/gemini-api/docs/models before changing.
  */
-import type { GeminiServerConfig } from './config-types.ts'
+import type { AiServerConfig } from './config-types.ts'
 
-const config: GeminiServerConfig = {
-  // 'gemini-api' uses an API key from Google AI Studio.
-  // 'vertex-ai' uses a Google Cloud project (run `gcloud auth application-default login` or use a service account).
-  provider: 'gemini-api',
-  apiKeyEnv: 'GEMINI_API_KEY',
-  vertex: {
-    projectEnv: 'GOOGLE_CLOUD_PROJECT',
-    location: 'global',
+const config: AiServerConfig = {
+  provider: 'gemini',
+
+  gemini: {
+    // 'gemini-api' uses an API key from Google AI Studio.
+    // 'vertex-ai' uses a Google Cloud project (run `gcloud auth application-default login` or use a service account).
+    mode: 'gemini-api',
+    apiKeyEnv: 'GEMINI_API_KEY',
+    vertex: {
+      projectEnv: 'GOOGLE_CLOUD_PROJECT',
+      location: 'global',
+    },
+    model: 'gemini-3.8-flash',
+    fallbackModel: 'gemini-3.5-flash-lite',
+    safetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE',
   },
 
-  model: 'gemini-3.8-flash',
-  fallbackModel: 'gemini-3.5-flash-lite',
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    apiKeyEnv: 'OPENAI_API_KEY',
+    model: 'gpt-5.1',
+    fallbackModel: 'gpt-5.1-mini',
+    // Reasoning models accept `reasoning_effort`; older chat models reject it.
+    sendReasoningEffort: true,
+    headers: {},
+  },
+
+  gauss: {
+    // Point this at your Gauss gateway. The server speaks the OpenAI /chat/completions
+    // API; if your gateway differs, adapt providers/openai.ts (one request builder and
+    // one SSE reader) rather than the rest of the server.
+    baseUrl: process.env.GAUSS_BASE_URL ?? 'https://gauss.internal/v1',
+    apiKeyEnv: 'GAUSS_API_KEY',
+    model: process.env.GAUSS_MODEL ?? 'gauss2-flash',
+    sendReasoningEffort: false,
+    headers: {},
+  },
 
   // Settings for every task unless overridden below.
   // Temperature is deliberately not set: Google recommends the default (1.0) for Gemini 3 models.
@@ -46,8 +75,6 @@ const config: GeminiServerConfig = {
     // Chat with the document: answers cite blocks; may include an edits block when asked for changes.
     chat: { thinkingLevel: 'medium', maxOutputTokens: 4096 },
   },
-
-  safetyThreshold: 'BLOCK_MEDIUM_AND_ABOVE',
 
   // House style added to every system prompt, e.g.
   // 'Use British English. Refer to the company as "Samsung". Never invent figures.'

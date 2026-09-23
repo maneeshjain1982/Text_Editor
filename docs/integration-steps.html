@@ -522,13 +522,16 @@ onMounted(<span class="k">async</span> () =&gt; {
         <div class="num" aria-hidden="true">10</div>
         <div class="step-body">
           <h2>Add Word export where you need it <span class="tag">optional</span></h2>
-          <p>The toolbar’s <b>File</b> menu already opens and downloads .docx. To use your own buttons, call the editor through a template ref.</p>
+          <p>The toolbar has one file button, <b>Download as Word (.docx)</b>. Opening a file and the other formats (.html, .md, .txt, .json) are host actions — call the editor through a template ref from your own buttons.</p>
           <div class="code">
             <div class="code-head"><span>DocumentEdit.vue</span><button class="copy" type="button">Copy</button></div>
 <pre><span class="k">const</span> editorRef = ref&lt;RichEditorExpose&gt;()
 
 <span class="c">// download to the user's computer</span>
 editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report'</span>)
+
+<span class="c">// open a file the user picked (.docx, .html, .md, .txt, .json)</span>
+editorRef.value?.importFile(file)
 
 <span class="c">// or get the file and send it to your server</span>
 <span class="k">const</span> blob = <span class="k">await</span> editorRef.value!.exportDocx()
@@ -537,20 +540,21 @@ editorRef.value?.download(<span class="s">'docx'</span>, <span class="s">'report
 &lt;RichEditor ref="editorRef" v-model="content" layout="document" /&gt;</pre>
           </div>
           <p>For list pages that export without showing the editor, use <code>import { exportDocx } from '@local/rich-editor/docx'</code> with JSON content.</p>
+          <p>Writers can control pagination: the <b>Page break</b> toolbar button (Ctrl+Enter) inserts a break that becomes a real Word page break and is honoured when printing.</p>
         </div>
       </article>
 
       <article class="step" id="s11">
         <div class="num" aria-hidden="true">11</div>
         <div class="step-body">
-          <h2>Add the AI Canvas with Gemini <span class="tag">optional</span></h2>
-          <p>Users generate a draft, then change only the part they point at. Every AI change is a suggestion to accept or reject. The Gemini key stays on a server; the editor only calls your own <code>/api/ai</code> endpoint.</p>
-          <div class="where">examples/ai-server (settings in one file: gemini.config.ts)</div>
+          <h2>Add the AI Canvas (Gemini, ChatGPT or Gauss) <span class="tag">optional</span></h2>
+          <p>Users generate a draft, then change only the part they point at. Every AI change is a suggestion to accept or reject. The provider key stays on a server; the editor only calls your own <code>/api/ai</code> endpoint. One setting in <code>ai.config.ts</code> chooses Gemini, ChatGPT (OpenAI) or Samsung Gauss - the front end does not change.</p>
+          <div class="where">examples/ai-server (settings in one file: ai.config.ts)</div>
           <div class="code">
             <div class="code-head"><span>terminal · AI server</span><button class="copy" type="button">Copy</button></div>
 <pre>cd examples/ai-server
 npm install
-cp .env.example .env   <span class="c"># set GEMINI_API_KEY</span>
+cp .env.example .env   <span class="c"># set the key for your provider, e.g. GEMINI_API_KEY</span>
 npm start              <span class="c"># or: npm run mock (no key, demo answers)</span></pre>
           </div>
           <div class="code">
@@ -618,7 +622,7 @@ npm start              <span class="c"># or: npm run mock (no key, demo answers)
           <li><label><input type="checkbox" id="c6"><span>Brand colors and dark mode apply, including in dropdowns</span></label></li>
           <li><label><input type="checkbox" id="c7"><span>An exported .docx opens correctly in Word, with images</span></label></li>
           <li><label><input type="checkbox" id="c8"><span>The page works at your smallest supported screen width</span></label></li>
-          <li><label><input type="checkbox" id="c9"><span>AI (if used): the key is only on the server, <code>/api/ai</code> requires login, and a suggestion appears for a real Gemini request</span></label></li>
+          <li><label><input type="checkbox" id="c9"><span>AI (if used): the key is only on the server, <code>/api/ai</code> requires login, and a suggestion appears for a real provider request</span></label></li>
         </ul>
       </section>
 
@@ -636,7 +640,7 @@ npm start              <span class="c"># or: npm run mock (no key, demo answers)
               <tr><td>Brand colors missing in dropdowns</td><td>Add <code>.re-portal</code> to your variable selector (step 8).</td></tr>
               <tr><td>Images missing from the Word file</td><td>The image host blocks CORS. Allow your app’s origin (step 7).</td></tr>
               <tr><td>First Word export reloads the page in development</td><td>Add <code>optimizeDeps: { include: ['docx', 'mammoth', 'marked', 'turndown', 'turndown-plugin-gfm'] }</code> to <code>vite.config.ts</code>.</td></tr>
-              <tr><td>AI bar says <td>Change the component’s <code>:key</code> to remount it.</td></tr>
+              <tr><td>Changing <code>features</code> has no effect</td><td>They are read when the editor mounts. Change the component’s <code>:key</code> to remount it.</td></tr>
             </tbody>
           </table>
         </div>

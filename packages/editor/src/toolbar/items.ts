@@ -2,7 +2,7 @@ import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'
 import {
   Bold, ClipboardType, Code, Italic, ListIndentDecrease, ListIndentIncrease, List, ListOrdered, ListTodo,
-  Maximize2, MessagesSquare, Minus, Printer, Redo2, RemoveFormatting, SquareCode, Strikethrough, Subscript, Superscript,
+  Maximize2, MessagesSquare, Minus, SquareSplitVertical, Printer, Redo2, RemoveFormatting, SquareCode, Strikethrough, Subscript, Superscript,
   TextQuote, TextSearch, Underline, Undo2,
 } from 'lucide-vue-next'
 import type { EditorContext } from '../context'
@@ -39,6 +39,7 @@ export const BUTTON_ITEMS: Partial<Record<ToolbarItem, ButtonItem>> = {
   blockquote: { icon: TextQuote, label: 'blockquote', shortcut: 'Mod-Shift-B', run: (e) => chain(e).toggleBlockquote().run(), isActive: (e) => e.isActive('blockquote') },
   codeBlock: { icon: SquareCode, label: 'codeBlock', shortcut: 'Mod-Alt-C', run: (e) => chain(e).toggleCodeBlock().run(), isActive: (e) => e.isActive('codeBlock') },
   horizontalRule: { icon: Minus, label: 'horizontalRule', run: (e) => chain(e).setHorizontalRule().run() },
+  pageBreak: { icon: SquareSplitVertical, label: 'pageBreak', shortcut: 'Mod-Enter', run: (e) => chain(e).setPageBreak().run(), isActive: (e) => e.isActive('pageBreak') },
   findReplace: { icon: TextSearch, label: 'findReplace', shortcut: 'Mod-F', run: (_e, ctx) => (ctx.findOpen.value = !ctx.findOpen.value), isActive: (_e, ctx) => ctx.findOpen.value },
   pastePlain: { icon: ClipboardType, label: 'pastePlain', shortcut: 'Mod-Shift-V', run: (_e, ctx) => void ctx.pastePlain() },
   print: { icon: Printer, label: 'print', run: (_e, ctx) => ctx.print() },
@@ -54,7 +55,7 @@ export const TOOLBAR_PRESETS: Record<'full' | 'basic', ToolbarGroup[]> = {
     ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
     ['align', 'lineHeight', 'bulletList', 'orderedList', 'taskList', 'outdent', 'indent'],
     ['link', 'image', 'table'],
-    ['blockquote', 'codeBlock', 'horizontalRule', 'specialChars'],
+    ['blockquote', 'codeBlock', 'horizontalRule', 'pageBreak', 'specialChars'],
     ['code', 'superscript', 'subscript', 'clearFormatting'],
     ['findReplace', 'pastePlain', 'print', 'fullscreen'],
   ],
@@ -75,6 +76,7 @@ const FEATURE_ITEMS: Partial<Record<ToolbarItem, keyof EditorFeatures>> = {
   taskList: 'taskList',
   ai: 'ai',
   chat: 'chat',
+  file: 'docx',
 }
 
 export function resolveToolbar(config: ToolbarConfig, features: Required<EditorFeatures>): ToolbarGroup[] {

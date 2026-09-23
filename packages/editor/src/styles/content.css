@@ -100,6 +100,38 @@
   margin-bottom: 0;
 }
 
+/* Page break: where Word and printing start a new page */
+.re-content [data-type='page-break'] {
+  position: relative;
+  height: 0;
+  margin: 1.4em 0;
+  border-top: 2px dashed var(--re-border);
+  page-break-after: always;
+  break-after: page;
+}
+
+.re-content [data-type='page-break']::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -0.75em;
+  right: 0;
+  padding: 0 6px;
+  background: var(--re-bg);
+  color: var(--re-muted);
+  font-family: var(--re-ui-font, sans-serif);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+@media print {
+  .re-content [data-type='page-break'] {
+    border: 0;
+    margin: 0;
+  }
+  .re-content [data-type='page-break']::after {
+    content: none;
+  }
+}
 .re-content hr {
   border: none;
   border-top: 1px solid var(--re-border);

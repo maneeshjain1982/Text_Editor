@@ -98,6 +98,19 @@ describe('exportDocx', () => {
     expect(letter.document).toMatch(/<w:pgSz w:w="12240" w:h="15840"/)
   })
 
+  it('exports a page break as a Word page break', async () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Page one' }] },
+        { type: 'pageBreak' },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Page two' }] },
+      ],
+    }
+    const { document } = await unzip(await exportDocx(doc))
+    expect(document).toContain('<w:br w:type="page"/>')
+  })
+
   it('exports an empty document', async () => {
     const { document } = await unzip(await exportDocx({ type: 'doc', content: [] }))
     expect(document).toContain('<w:p')

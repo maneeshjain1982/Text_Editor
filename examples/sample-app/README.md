@@ -88,7 +88,7 @@ Documents are saved in the browser's `localStorage` by a mock API, so they stay 
 
 ### Run with AI (Gemini)
 
-The AI Canvas needs the Gemini server from [`examples/ai-server`](../ai-server/README.md). Start it in a second terminal; the sample app forwards `/api/ai` to it.
+The AI Canvas needs the AI server from [`examples/ai-server`](../ai-server/README.md). Start it in a second terminal; the sample app forwards `/api/ai` to it.
 
 ```bash
 cd examples/ai-server
@@ -168,7 +168,7 @@ export default defineConfig({
 ```
 
 - No alias to the editor source is needed; Vite resolves `@local/rich-editor` from `node_modules`.
-- `proxy` forwards `/api/ai` to the Gemini server (step 12), so the browser only calls its own origin.
+- `proxy` forwards `/api/ai` to the AI server (step 12), so the browser only calls its own origin.
 - `optimizeDeps.include` pre-bundles what is loaded on demand: the editor's `/docx` entry, used when exporting from the list, and the libraries behind export and import. Without it, the first Word export in development reloads the page. Production builds don't need it.
 
 ### Step 3: Import the styles once
@@ -447,7 +447,7 @@ export const aiAdapter = createHttpAiAdapter({
 
 - **Browser:** calls `/api/ai/complete` on its own origin.
 - **Vite:** forwards the request to the AI server (step 2).
-- **AI server:** calls Gemini with the settings in [`gemini.config.ts`](../ai-server/gemini.config.ts). The API key lives only in the server's `.env`.
+- **AI server:** calls the provider chosen in [`ai.config.ts`](../ai-server/ai.config.ts) (Gemini, ChatGPT or Gauss). The API key lives only in the server's `.env`.
 - **`onEditorError`:** already handles `type: 'ai'` errors, like the other editor errors.
 - **Saving:** AI suggestions don't change `content` until accepted, so the save logic and the "Unsaved changes" indicator need no AI-specific code.
 - **Chat history:** `v-model:chat-history` is saved per document (in `localStorage` here; in your app, through your API), so the conversation comes back after a reload:
@@ -490,7 +490,7 @@ sample-app/
    ├─ router.ts              list / new / edit / view routes (editor pages lazy-loaded)
    ├─ App.vue                header with navigation and dark mode toggle
    ├─ api/documents.ts       mock API: list, get, save, remove, uploadImage (localStorage)
-   ├─ api/ai.ts              AI Canvas adapter → /api/ai/complete (proxied to the Gemini server)
+   ├─ api/ai.ts              AI Canvas adapter → /api/ai/complete (proxied to the AI server)
    ├─ composables/useTheme.ts  shared light/dark state
    ├─ views/
    │  ├─ DocumentList.vue    table of documents, headless .docx export

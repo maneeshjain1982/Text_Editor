@@ -10,6 +10,7 @@ import {
   ImageRun,
   LevelFormat,
   LineRuleType,
+  PageBreak,
   Packer,
   Paragraph,
   ShadingType,
@@ -248,6 +249,9 @@ async function convertBlock(node: JSONContent, ctx: Ctx, env: BlockEnv): Promise
 
     case 'codeBlock':
       return [codeBlockParagraph(node, env)]
+
+    case 'pageBreak':
+      return [new Paragraph({ children: [new PageBreak()], spacing: { after: 0, line: 240 } })]
 
     case 'horizontalRule':
       return [

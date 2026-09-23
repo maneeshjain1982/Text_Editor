@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { ArrowDownToLine, Check, CircleStop, Copy, MessagesSquare, Replace, RotateCcw, SendHorizontal, Trash2, X } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { ArrowDownToLine, Check, CircleStop, Copy, MessagesSquare, PanelRight, PictureInPicture2, Replace, RotateCcw, SendHorizontal, Trash2, X } from 'lucide-vue-next'
 import { useEditorContext } from '../../context'
 import { stripCitations } from '../../ai/chat-parse'
 import type { ChatController, ChatMessage } from '../../ai/chat'
 import ToolButton from '../ui/ToolButton.vue'
 import ChatMarkdown from './ChatMarkdown.vue'
 
-const props = defineProps<{ chat: ChatController; starters: string[] }>()
+const props = defineProps<{ chat: ChatController; starters: string[]; floating?: boolean }>()
+const emit = defineEmits<{ 'update:floating': [value: boolean] }>()
 const ctx = useEditorContext()
 const { t } = ctx
 const chat = props.chat
@@ -60,6 +61,75 @@ function close() {
   ctx.editor.value?.commands.focus()
 }
 
+// ---- floating window -------------------------------------------------------
+// The window is positioned inside the editor root, so it stays put in full screen too.
+const panelRef = ref<HTMLElement>()
+const position = ref<{ left: number; top: number } | null>(null)
+let drag: { pointerId: number; offsetX: number; offsetY: number } | null = null
+
+const floatingStyle = computed(() =>
+  props.floating && position.value ? { left: `${position.value.left}px`, top: `${position.value.top}px`, right: 'auto', bottom: 'auto' } : undefined,
+)
+
+function bounds() {
+  const root = panelRef.value?.closest('.re-root') as HTMLElement | null
+  const panel = panelRef.value
+  if (!root || !panel) return null
+  return { root: root.getBoundingClientRect(), panel: panel.getBoundingClientRect() }
+}
+
+function startDrag(event: PointerEvent) {
+  if (!props.floating || event.button !== 0) return
+  // Let the header's buttons keep working.
+  if ((event.target as HTMLElement).closest('button')) return
+  const box = bounds()
+  if (!box) return
+  drag = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - box.panel.left,
+    offsetY: event.clientY - box.panel.top,
+  }
+  position.value = { left: box.panel.left - box.root.left, top: box.panel.top - box.root.top }
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  event.preventDefault()
+}
+
+function onDrag(event: PointerEvent) {
+  if (!drag || event.pointerId !== drag.pointerId) return
+  const box = bounds()
+  if (!box) return
+  const maxLeft = Math.max(0, box.root.width - box.panel.width)
+  const maxTop = Math.max(0, box.root.height - box.panel.height)
+  position.value = {
+    left: Math.min(Math.max(0, event.clientX - box.root.left - drag.offsetX), maxLeft),
+    top: Math.min(Math.max(0, event.clientY - box.root.top - drag.offsetY), maxTop),
+  }
+}
+
+function endDrag(event: PointerEvent) {
+  if (drag?.pointerId === event.pointerId) {
+    ;(event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId)
+    drag = null
+  }
+}
+
+function setFloating(value: boolean) {
+  position.value = null
+  emit('update:floating', value)
+}
+
+// Keep the window inside the editor when it gets smaller.
+function clampToRoot() {
+  const box = bounds()
+  if (!box || !position.value) return
+  position.value = {
+    left: Math.min(position.value.left, Math.max(0, box.root.width - box.panel.width)),
+    top: Math.min(position.value.top, Math.max(0, box.root.height - box.panel.height)),
+  }
+}
+onMounted(() => window.addEventListener('resize', clampToRoot))
+onBeforeUnmount(() => window.removeEventListener('resize', clampToRoot))
+
 async function copy(message: ChatMessage) {
   try {
     await navigator.clipboard.writeText(stripCitations(message.content))
@@ -72,10 +142,29 @@ async function copy(message: ChatMessage) {
 </script>
 
 <template>
-  <aside class="re-chat" :aria-label="t('chatTitle')" data-testid="re-chat">
-    <header class="re-chat-header">
+  <aside
+    ref="panelRef"
+    class="re-chat"
+    :class="{ 're-chat-floating': floating }"
+    :style="floatingStyle"
+    :aria-label="t('chatTitle')"
+    data-testid="re-chat"
+  >
+    <header
+      class="re-chat-header"
+      :class="{ 're-chat-drag': floating }"
+      @pointerdown="startDrag"
+      @pointermove="onDrag"
+      @pointerup="endDrag"
+      @pointercancel="endDrag"
+    >
       <MessagesSquare :size="16" aria-hidden="true" class="re-chat-header-icon" />
       <h2>{{ t('chatTitle') }}</h2>
+      <ToolButton
+        :icon="floating ? PanelRight : PictureInPicture2"
+        :label="floating ? t('chatDock') : t('chatFloat')"
+        @click="setFloating(!floating)"
+      />
       <ToolButton :icon="Trash2" :label="t('chatClear')" :disabled="!chat.messages.value.length" @click="chat.clear()" />
       <ToolButton :icon="X" :label="t('close')" @click="close" />
     </header>

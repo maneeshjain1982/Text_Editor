@@ -5,6 +5,8 @@ export type ContentFormat = 'html' | 'json'
 export type EditorTheme = 'light' | 'dark' | 'auto'
 export type EditorLayout = 'document' | 'inline'
 export type PageSize = 'A4' | 'Letter'
+/** Where the document chat appears: docked beside the page, or a draggable window. */
+export type ChatMode = 'panel' | 'floating'
 
 /** Value accepted by `v-model`: an HTML string or TipTap JSON document. */
 export type EditorContent = string | JSONContent
@@ -17,7 +19,7 @@ export type ToolbarItem =
   | 'color' | 'highlight' | 'clearFormatting'
   | 'align' | 'lineHeight' | 'indent' | 'outdent'
   | 'bulletList' | 'orderedList' | 'taskList'
-  | 'blockquote' | 'codeBlock' | 'horizontalRule'
+  | 'blockquote' | 'codeBlock' | 'horizontalRule' | 'pageBreak'
   | 'link' | 'image' | 'table' | 'specialChars'
   | 'findReplace' | 'pastePlain'
   | 'file' | 'print' | 'fullscreen'
@@ -121,6 +123,13 @@ export interface RichEditorProps {
   chatHistory?: import('./ai/types').AiChatMessage[]
   /** Starter questions shown in an empty chat. */
   chatStarters?: string[]
+  /** `'panel'` docks the chat beside the page; `'floating'` opens a window the user can drag. */
+  chatMode?: ChatMode
+  /**
+   * Show where pages end while typing, like Word's page view: a block that would cross the
+   * bottom of a page is pushed onto the next one. Page layout only. Default `true`.
+   */
+  autoPageBreaks?: boolean
 }
 
 export interface RichEditorExpose {

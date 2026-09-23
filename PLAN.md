@@ -129,7 +129,7 @@ Like Gemini Canvas: generate once, then change only what you point at. Decisions
 | 4. Whole-document edits with block patches (only changed blocks), accept/reject all | ✅ |
 | 5. Version history (snapshot before each accepted change, restore) | ✅ |
 | 6. Chat with the document: side panel, cited answers with source links, follow-ups, selection context, edits as suggestions, insert/replace answers, history via v-model, long-document handling | ✅ (2026-09-22) |
-| Gemini server (`examples/ai-server`, one config file `gemini.config.ts`, mock mode) | ✅ |
+| AI server (`examples/ai-server`, one config file `ai.config.ts`, providers Gemini / ChatGPT / Gauss, mock mode) | ✅ |
 | Docs, sample app integration, tests (unit, playground E2E, package validation) | ✅ |
 
 Open: test against live Gemini with a real API key (development used mock mode and the demo adapter).

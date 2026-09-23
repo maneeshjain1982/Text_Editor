@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  ArrowRight, Baseline, Download, FilePlus, FileText, FolderOpen, Highlighter, History, Image as ImageIcon, Link, MessagesSquare, Omega, PenLine, Sparkles,
+  Baseline, Download, Highlighter, History, Image as ImageIcon, Link, MessagesSquare, Omega, PenLine, Sparkles,
   Table as TableIcon, TextAlignCenter, TextAlignEnd, TextAlignJustify, TextAlignStart, UnfoldVertical,
 } from 'lucide-vue-next'
 import { useEditorContext } from '../context'
-import type { ExportFormat, ToolbarItem } from '../types'
+import type { ToolbarItem } from '../types'
 import { BUTTON_ITEMS } from './items'
 import ToolButton from '../components/ui/ToolButton.vue'
 import Popover from '../components/ui/Popover.vue'
@@ -19,7 +19,6 @@ const ctx = useEditorContext()
 const { t } = ctx
 const editor = computed(() => ctx.editor.value)
 const open = ref(false)
-const fileInput = ref<HTMLInputElement>()
 
 const button = computed(() => BUTTON_ITEMS[props.item])
 
@@ -126,15 +125,15 @@ function insertTable({ rows, cols }: { rows: number; cols: number }) {
 }
 
 // ---- AI ----------------------------------------------------------------------
-type AiMenuAction = 'ask' | 'generate' | 'continue' | 'document' | 'chat' | 'versions'
+// "Continue writing" and "Edit whole document" are deliberately not in the menu; hosts
+// that want them call api.aiContinue() / api.aiEditDocument() from their own buttons.
+type AiMenuAction = 'ask' | 'generate' | 'chat' | 'versions'
 const aiOptions = computed<MenuOption<AiMenuAction>[]>(() => {
   void editor.value?.state
   const hasSelection = !!editor.value && !editor.value.state.selection.empty
   return [
     { value: 'ask', label: t('aiAsk'), icon: Sparkles, disabled: !hasSelection, hint: hasSelection ? undefined : t('aiSelectionRequired') },
     { value: 'generate', label: t('aiGenerate'), icon: PenLine },
-    { value: 'continue', label: t('aiContinue'), icon: ArrowRight },
-    { value: 'document', label: t('aiEditDocument'), icon: FileText },
     ...(ctx.chat.value ? [{ value: 'chat' as const, label: t('chatTitle'), icon: MessagesSquare, hint: 'Ctrl+Alt+J' }] : []),
     { value: 'versions', label: t('aiVersions'), icon: History, separatorBefore: true },
   ]
@@ -146,34 +145,12 @@ function onAiAction(action: AiMenuAction) {
   if (action === 'versions') ctx.openDialog('versions')
   else if (action === 'chat') ctx.chat.value?.setOpen(true)
   else if (action === 'ask') ai.open('edit-selection')
-  else if (action === 'generate') ai.open('generate')
-  else if (action === 'document') ai.open('edit-document')
-  else if (ai.open('continue')) void ai.run('', t('aiContinue'))
+  else ai.open('generate')
 }
 
 // ---- file --------------------------------------------------------------------
-type FileAction = 'new' | 'open' | ExportFormat
-const fileOptions = computed<MenuOption<FileAction>[]>(() => [
-  { value: 'new', label: t('newDocument'), icon: FilePlus },
-  { value: 'open', label: t('open'), icon: FolderOpen, hint: t('openHint') },
-  ...(ctx.features.value.docx ? [{ value: 'docx' as const, label: t('formatDocx'), icon: Download, separatorBefore: true }] : []),
-  { value: 'html', label: t('formatHtml'), icon: Download, separatorBefore: !ctx.features.value.docx },
-  { value: 'markdown', label: t('formatMarkdown'), icon: Download },
-  { value: 'text', label: t('formatText'), icon: Download },
-  { value: 'json', label: t('formatJson'), icon: Download },
-])
-function onFileAction(action: FileAction) {
-  open.value = false
-  if (action === 'new') ctx.newDocument()
-  else if (action === 'open') fileInput.value?.click()
-  else void ctx.download(action)
-}
-function onFilePicked(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) void ctx.importFile(file)
-  input.value = ''
-}
+// The toolbar only offers the Word download. Hosts that want New / Open / other
+// formats call api.newDocument(), api.importFile() and api.download() themselves.
 </script>
 
 <template>
@@ -273,21 +250,10 @@ function onFilePicked(e: Event) {
 
   <ToolButton v-else-if="item === 'specialChars'" :icon="Omega" :label="t('specialChars')" @click="ctx.openDialog('specialChars')" />
 
-  <template v-else-if="item === 'file'">
-    <Popover v-model:open="open" :label="t('file')">
-      <template #trigger="{ toggle }">
-        <ToolButton :icon="FileText" :label="t('file')" show-label has-menu :expanded="open" @click="toggle" />
-      </template>
-      <MenuList :options="fileOptions" :label="t('file')" @select="onFileAction" />
-    </Popover>
-    <input
-      ref="fileInput"
-      type="file"
-      class="re-visually-hidden"
-      tabindex="-1"
-      aria-hidden="true"
-      accept=".docx,.html,.htm,.md,.markdown,.txt,.json"
-      @change="onFilePicked"
-    />
-  </template>
+  <ToolButton
+    v-else-if="item === 'file'"
+    :icon="Download"
+    :label="t('downloadDocx')"
+    @click="ctx.download('docx')"
+  />
 </template>

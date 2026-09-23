@@ -4,7 +4,8 @@ import { buildExtensions } from '../src/extensions'
 import { cleanPastedHTML } from '../src/extensions/PasteCleanup'
 import { ensureTrailingParagraph, normalizeContent } from '../src/services/content'
 import { DEFAULT_FEATURES } from '../src/defaults'
-import { toHtmlDocument, toMarkdown } from '../src/services/exporters'
+import { markdownPageBreaksToHtml, toHtmlDocument, toMarkdown } from '../src/services/exporters'
+import { PAGE_BREAK_HTML, PAGE_BREAK_MARKER } from '../src/extensions/PageBreak'
 import { extractHtmlBody, textToHtml } from '../src/services/importers'
 import { readImageSize, validateImage } from '../src/services/image'
 import { resolveToolbar } from '../src/toolbar/items'
@@ -142,6 +143,57 @@ describe('schema round trip', () => {
     expect(json.content![0].type).toBe('taskList')
     expect(json.content![0].content![0].attrs!.checked).toBe(true)
     expect(json.content![1].type).toBe('codeBlock')
+  })
+})
+
+describe('page breaks', () => {
+  it('keeps page breaks through the schema and parses Word-style CSS breaks', () => {
+    const out = createEditor('<p>one</p><div data-type="page-break"></div><p>two</p>').getHTML()
+    expect(out).toContain('data-type="page-break"')
+
+    const legacy = createEditor('<p>one</p><p style="page-break-before: always"></p><p>two</p>').getJSON()
+    expect(legacy.content!.some((node) => node.type === 'pageBreak')).toBe(true)
+  })
+
+  it('inserts a page break with the command', () => {
+    const e = createEditor('<p>one</p>')
+    e.commands.setPageBreak()
+    expect(e.getJSON().content!.some((node) => node.type === 'pageBreak')).toBe(true)
+  })
+
+  it('round trips through Markdown as a comment marker', () => {
+    const md = toMarkdown('<p>one</p><div data-type="page-break"></div><p>two</p>')
+    expect(md).toContain(PAGE_BREAK_MARKER)
+    expect(markdownPageBreaksToHtml(md)).toContain(PAGE_BREAK_HTML)
+  })
+})
+
+describe('automatic pagination', () => {
+  it('is off unless the page layout asks for it, and adds no nodes to the document', () => {
+    const off = new Editor({
+      content: '<p>one</p>',
+      extensions: buildExtensions({
+        placeholder: () => '',
+        features: { ...DEFAULT_FEATURES, images: false },
+        image: { maxImageSize: 1024, onError: () => {} },
+      }),
+    })
+    expect(off.state.plugins.some((p) => (p as { key?: string }).key?.startsWith('autoPagination'))).toBe(false)
+    off.destroy()
+
+    editor = new Editor({
+      content: '<p>one</p>',
+      extensions: buildExtensions({
+        placeholder: () => '',
+        features: { ...DEFAULT_FEATURES, images: false },
+        image: { maxImageSize: 1024, onError: () => {} },
+        autoPagination: { enabled: true, label: 'Page {page}' },
+      }),
+    })
+    expect(editor.state.plugins.some((p) => (p as { key?: string }).key?.startsWith('autoPagination'))).toBe(true)
+    // Page gaps are decorations, so content and exports are unaffected.
+    expect(editor.getHTML()).toBe('<p>one</p>')
+    expect(editor.storage.autoPagination.pages).toBe(1)
   })
 })
 

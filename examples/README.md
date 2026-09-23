@@ -1,11 +1,11 @@
-# Examples: sample app, Gemini server and package validation
+# Examples: sample app, AI server and package validation
 
 These projects check that `@local/rich-editor` works as an **installed package**. Unlike the playground, which reads the editor's source code directly, they install the packed `.tgz` file exactly as your dashboard would.
 
 | Project | What it is |
 |---|---|
 | [`sample-app/`](sample-app) | **Docs Hub**, a small Vue 3 + TypeScript + Vite + Vue Router app. It uses the editor the way the [integration guide](../docs/INTEGRATION.md) describes. Its [README](sample-app/README.md) explains how to run it and how the editor is integrated. |
-| [`ai-server/`](ai-server) | Reference **Gemini** backend for the AI Canvas. Configured in one file, [`gemini.config.ts`](ai-server/gemini.config.ts). Its [README](ai-server/README.md) covers setup, the API and a production checklist. |
+| [`ai-server/`](ai-server) | Reference backend for the AI Canvas, for **Gemini**, **ChatGPT** or **Gauss**. Configured in one file, [`ai.config.ts`](ai-server/ai.config.ts). Its [README](ai-server/README.md) covers setup, the API and a production checklist. |
 | [`sample-app-tests/`](sample-app-tests) | A separate test project (Playwright). It checks the installed package, then tests the sample app's **production build** in a real browser, with the AI server in mock mode. |
 
 All three folders are standalone npm projects. They are deliberately **not** part of the root npm workspace, so nothing can be resolved from the editor's source by mistake.

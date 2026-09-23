@@ -13,10 +13,11 @@ A rich text editor for **Vue 3**, shipped as a local npm package (`@local/rich-e
 | **Writing** | Headings, fonts, sizes, colors, highlight, bold, italic, underline, strikethrough, sub/superscript, alignment, line spacing, indent, bulleted, numbered and check lists, quotes, code blocks with syntax colors, links, special characters and emoji, find and replace, undo/redo, clean paste from Word and Google Docs |
 | **Tables** | Insert with a grid picker; add or delete rows and columns; merge and split cells; header row and column; cell color; column resize |
 | **Images** | Upload, drag and drop, paste or URL; resize, align, wrap text, caption, alt text; optional upload to your backend |
-| **Files** | Open .docx, .html, .md, .txt, .json · Download **.docx**, .html, .md, .txt, .json · Print or save as PDF |
+| **Files** | Toolbar: download **.docx**. API: `importFile()` opens .docx, .html, .md, .txt, .json and `download()` writes all five · Print or save as PDF |
+| **Page breaks** | Automatic page view like Word: a block that would cross the bottom of a page moves to the next one, with page numbers in the gap. Ctrl+Enter adds a manual break; both export as real Word page breaks |
 | **Word fidelity** | Native Word headings, numbered lists, tables (merges, shading, widths), embedded images, fonts, colors and A4/Letter pages. The editor's page view matches the Word page. |
 | **AI Canvas** *(optional)* | Rewrite a selection (Ask AI or quick actions), generate, continue writing, or edit the whole document, regenerating **only the parts that change**. Every change is a suggestion to accept or reject, with version history. |
-| **Chat with the document** *(optional)* | Questions answered from the document with **clickable sources**, follow-up questions, selection context, and requested changes as suggestions |
+| **Chat with the document** *(optional)* | Questions answered from the document with **clickable sources**, follow-up questions, selection context, and requested changes as suggestions. Docked beside the page or a **floating window** the user can drag anywhere |
 | **Integration** | `v-model` (HTML or JSON), typed props, events and methods, CSS-variable theming, light/dark/auto, page or inline layout, responsive toolbar, translatable text, keyboard and screen-reader support |
 
 ## Documentation
@@ -26,7 +27,7 @@ A rich text editor for **Vue 3**, shipped as a local npm package (`@local/rich-e
 | **[User guide](docs/USER-GUIDE.md)** | People writing documents: every feature, AI and chat, shortcuts, FAQ |
 | **[Integration guide](docs/INTEGRATION.md)** ([HTML version](docs/integration-steps.html)) | Front-end developers adding the editor to an existing Vue app |
 | **[API reference](packages/editor/README.md)** | Every prop, event, method, slot, CSS variable and toolbar item |
-| **[Gemini AI server](examples/ai-server/README.md)** | Setting up the AI backend: one config file (`gemini.config.ts`), API, production checklist |
+| **[AI server](examples/ai-server/README.md)** | Setting up the AI backend for **Gemini, ChatGPT or Gauss**: one config file (`ai.config.ts`), API, production checklist |
 | **[Sample app](examples/sample-app/README.md)** | A working Vue app that uses the editor as a package, with a step-by-step integration walkthrough |
 | **[Examples and validation](examples/README.md)** | The sample app, the AI server and the package validation tests |
 | **[GEMINI.md](GEMINI.md)** | Developers and AI coding assistants: architecture, rules, known pitfalls, how to extend |
@@ -39,7 +40,7 @@ A rich text editor for **Vue 3**, shipped as a local npm package (`@local/rich-e
 | To… | You need |
 |---|---|
 | Build this repository | Node **20.19+ or 22.12+**, npm 10+ |
-| Run the Gemini AI server | Node **22.18+**, and a Gemini API key or a Google Cloud project |
+| Run the AI server | Node **22.18+**, and a key for the chosen provider (Gemini, ChatGPT or Gauss) |
 | Use the package in an app | **Vue 3.3+**, and a bundler that supports `package.json` `exports`: Vite (recommended), webpack 5, Rollup or esbuild |
 
 Vue 2 is not supported.
@@ -55,14 +56,14 @@ npm run dev                  # playground (a mock dashboard) at http://localhost
 
 The playground uses an offline **demo AI**, so AI and chat work without a key.
 
-### Try it with Gemini
+### Try it with a real LLM
 
 ```bash
 npm run build && npm run pack
 
 cd examples/ai-server
 npm install
-cp .env.example .env         # set GEMINI_API_KEY (https://aistudio.google.com/apikey)
+cp .env.example .env         # set the key for the provider in ai.config.ts (default: GEMINI_API_KEY)
 npm start                    # or: npm run mock (no key, demo answers)
 
 cd ../sample-app             # in a second terminal
@@ -85,7 +86,7 @@ import { RichEditor, createHttpAiAdapter } from '@local/rich-editor'
 import '@local/rich-editor/styles.css'
 
 const html = ref('')
-// Optional: AI Canvas and chat. Your backend holds the Gemini key (see examples/ai-server).
+// Optional: AI Canvas and chat. Your backend holds the provider key (see examples/ai-server).
 const ai = createHttpAiAdapter({ url: '/api/ai/complete' })
 </script>
 
@@ -122,7 +123,7 @@ Editor/
 ├─ apps/playground/            demo dashboard for development and end-to-end tests
 ├─ e2e/                        Playwright tests (playground): editor.e2e.ts, chat.e2e.ts
 ├─ examples/
-│  ├─ ai-server/               Gemini backend (gemini.config.ts, mock mode)
+│  ├─ ai-server/               AI backend: Gemini / ChatGPT / Gauss (ai.config.ts, mock mode)
 │  ├─ sample-app/              Vue 3 app that installs the editor from its .tgz
 │  └─ sample-app-tests/        package checks + browser tests of the sample app's production build
 ├─ docs/
@@ -146,7 +147,7 @@ Run these from the repository root unless noted.
 | `npm run test -w @local/rich-editor` | Unit tests (Vitest): Word export, search, schema, exporters, AI suggestions, chat |
 | `npx playwright test` | End-to-end tests in the installed Microsoft Edge (`PW_CHANNEL=chrome` for Chrome) |
 | `npm run validate` in `examples/sample-app-tests` | Rebuilds and packs the editor, installs it in the sample app and AI server, then runs the package checks and browser tests (AI server in mock mode) |
-| `npm start` / `npm run mock` in `examples/ai-server` | Gemini server / the same server without calling Gemini |
+| `npm start` / `npm run mock` in `examples/ai-server` | AI server / the same server without calling the provider |
 
 ## Build output
 
@@ -167,9 +168,9 @@ Run these from the repository root unless noted.
 
 ## Security and privacy
 
-- **The Gemini API key stays on the server.** The editor only calls your backend, through an adapter.
+- **The provider API key stays on the server.** The editor only calls your backend, through an adapter.
 - **AI output is always shown as a suggestion,** and is filtered through the editor's content rules, never inserted as raw HTML.
-- **What's sent to Gemini:** AI edits send the selected text plus some surrounding text; chat sends the whole document (up to about 150,000 characters) with each question. Check this against your data policy. Vertex AI offers enterprise data controls.
+- **What's sent to the provider:** AI edits send the selected text plus some surrounding text; chat sends the whole document (up to about 150,000 characters) with each question. Check this against your data policy. Vertex AI offers enterprise data controls.
 - Sanitize stored HTML on your server and before any `v-html` ([integration guide §11](docs/INTEGRATION.md#11-security)).
 
 ## Known limitations
@@ -181,4 +182,4 @@ Run these from the repository root unless noted.
 - **Chat on very long documents** (over about 60 pages) searches only the part around the cursor.
 - **Remounting:** `features` and `extensions` are read when the editor mounts; change its `key` to apply new values.
 - **TypeScript:** needs `moduleResolution` `bundler` or `node` (not `node16` or `nodenext`).
-- **Not yet verified:** a live Gemini call (development and tests used the demo adapter and the server's mock mode), and opening exported .docx files in desktop Word by hand.
+- **Not yet verified:** a live call to any provider (development and tests used the demo adapter, the server's mock mode and a fake OpenAI-compatible endpoint), and opening exported .docx files in desktop Word by hand.

@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model'
-import { toMarkdown } from '../services/exporters'
+import { markdownPageBreaksToHtml, toMarkdown } from '../services/exporters'
 
 /** Markdown of a document range (formatting that Markdown can't express is dropped). */
 export function rangeToMarkdown(editor: Editor, from: number, to: number): string {
@@ -30,7 +30,7 @@ export function textAround(editor: Editor, from: number, to: number, chars: numb
  */
 export async function markdownToFragment(schema: Schema, markdown: string): Promise<Fragment> {
   const { marked } = await import('marked')
-  const html = await marked.parse(markdown, { gfm: true, breaks: false })
+  const html = await marked.parse(markdownPageBreaksToHtml(markdown), { gfm: true, breaks: false })
   const container = document.createElement('div')
   container.innerHTML = html
 

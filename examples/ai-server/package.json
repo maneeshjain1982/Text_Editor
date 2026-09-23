@@ -2,7 +2,7 @@
   "name": "rich-editor-ai-server",
   "private": true,
   "version": "1.0.0",
-  "description": "Reference Gemini backend for the Rich Editor AI Canvas.",
+  "description": "Reference AI backend (Gemini / ChatGPT / Gauss) for the Rich Editor AI Canvas.",
   "type": "module",
   "engines": {
     "node": ">=22.18.0"

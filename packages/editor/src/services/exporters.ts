@@ -1,6 +1,7 @@
 import TurndownService from 'turndown'
 // @ts-expect-error – package ships no types
 import { gfm } from 'turndown-plugin-gfm'
+import { PAGE_BREAK_HTML, PAGE_BREAK_MARKER } from '../extensions/PageBreak'
 import tokensCss from '../styles/tokens.css?raw'
 import contentCss from '../styles/content.css?raw'
 
@@ -74,13 +75,25 @@ export function toMarkdown(html: string): string {
         return `\n\n${md}${caption ? `\n*${caption}*` : ''}\n\n`
       },
     })
+    // Page breaks survive a Markdown round trip as an HTML comment.
+    turndown.addRule('pageBreak', {
+      filter: (node) => node.getAttribute?.('data-type') === 'page-break',
+      replacement: () => `\n\n${PAGE_BREAK_MARKER}\n\n`,
+    })
     turndown.addRule('highlight', { filter: ['mark'], replacement: (c) => `==${c}==` })
     turndown.addRule('underline', { filter: ['u'], replacement: (c) => `<u>${c}</u>` })
   }
   // The GFM plugin only converts tables whose header row is the first child, so drop the
   // <colgroup> TipTap adds for column widths (widths have no Markdown equivalent anyway).
-  return turndown.turndown(html.replace(/<colgroup>[\s\S]*?<\/colgroup>/g, ''))
+  // Page-break divs are empty, and turndown discards empty blocks before custom rules run,
+  // so give them content the rule can replace.
+  return turndown.turndown(
+    html.replace(/<colgroup>[\s\S]*?<\/colgroup>/g, '').replace(/(<div[^>]*data-type="page-break"[^>]*>)\s*(<\/div>)/g, '$1page break$2'),
+  )
 }
+
+/** Markdown → HTML page-break markers, so imported Markdown keeps its page breaks. */
+export const markdownPageBreaksToHtml = (markdown: string) => markdown.split(PAGE_BREAK_MARKER).join(PAGE_BREAK_HTML)
 
 export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)

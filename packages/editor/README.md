@@ -9,7 +9,8 @@ A rich text editor component for **Vue 3**. It supports tables, images and Word 
 - **Tables:** insert with a grid picker, add or delete rows and columns, merge and split cells, header row and column, column resizing, cell color
 - **Images:** upload, drag and drop, paste, or insert by URL. You can resize them, align them, wrap text around them, and add alt text and a caption. Uploads can go to your backend through an optional adapter.
 - Editing tools: undo and redo, find and replace, links, special characters and emoji, paste cleanup (Word and Google Docs), paste as plain text, word and character count
-- Files: open **.docx**, .html, .md, .txt and .json; download **.docx**, .html, .md, .txt and .json; print or save as PDF
+- Files: the toolbar downloads **.docx**; download() and importFile() also handle .html, .md, .txt and .json; print or save as PDF
+- Page breaks: automatic page view (a block that would cross the page edge moves to the next page) plus manual breaks with Ctrl+Enter, exported as real Word page breaks
 - Two layouts, `document` (an A4 or Letter page) and `inline`, plus full screen, light, dark and automatic themes
 - **AI Canvas (optional):** generate drafts, rewrite a selection, continue writing, edit the whole document, or **chat with the document** (cited answers, changes as suggestions). Changes appear as suggestions you accept or reject, and only the affected text is regenerated. Works with Gemini (reference server included) or any model behind your backend.
 - Built-in accessibility: WAI-ARIA toolbar with arrow-key navigation, labelled controls, focus-trapped dialogs, and reduced-motion support
@@ -33,6 +34,27 @@ npm install <path-to-repo>/packages/editor
 ```
 
 `vue` (3.3 or later) is a peer dependency. The editor uses your dashboard's copy, so only one copy of Vue is loaded.
+
+### Using it in any project
+
+The package is self-contained: its source imports only its own files and its declared dependencies (enforced by `test/package.spec.ts`), and nothing in it refers to this repository, the playground or the sample app. Any Vue 3 project can therefore consume it in one of three ways:
+
+| Way | Command | When |
+|---|---|---|
+| Tarball | `npm install ./local-rich-editor-<version>.tgz` | Sharing a build by file or artifact store |
+| Git dependency | `npm install git+ssh://…/Text_Editor.git#main` (run `npm run build` in `packages/editor` via `prepare`) | Internal projects tracking the repo |
+| Private registry | `npm publish` from `packages/editor` after setting `"name"` to your scope and removing `"private"` if present | Several teams consuming released versions |
+
+To publish to a registry:
+
+```bash
+cd packages/editor
+npm version <patch|minor|major>   # a renamed prop or toolbar item is a major
+npm run build
+npm publish --registry https://your-registry.example.com
+```
+
+Requirements on the consuming side: Vue 3.3+, and a bundler that understands `package.json` `exports` (Vite, webpack 5, Rollup, esbuild). Import `@local/rich-editor/styles.css` once. The `./docx` and `./ai` entries work in Node without Vue or a DOM, so a backend can reuse them.
 
 ## Basic usage
 
@@ -76,6 +98,8 @@ The editor needs the browser, so render it on the client only:
 | `content-format` | `'html' \| 'json'` | `'html'` | The format `v-model` emits |
 | `layout` | `'inline' \| 'document'` | `'inline'` | `document` shows a white page on a grey background |
 | `page-size` | `'A4' \| 'Letter'` | `'A4'` | Page size for the document layout, .docx export and printing |
+| `auto-page-breaks` | `boolean` | `true` | Shows where pages end while typing (page layout only) |
+| `chat-mode` | `'panel' \| 'floating'` | `'panel'` | Chat docked beside the page, or a window the user can drag and resize |
 | `height` | `number \| string` | `400` (inline) | Height of the editor. `'auto'` grows with the content. |
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | `auto` follows the operating system setting |
 | `toolbar` | `'full' \| 'basic' \| 'none' \| ToolbarItem[][]` | `'full'` | Toolbar preset, or your own groups of buttons |
@@ -183,7 +207,7 @@ For the full list of variables, see `src/styles/tokens.css`.
 <RichEditor :toolbar="[['bold', 'italic', 'underline'], ['bulletList', 'orderedList'], ['link', 'image', 'table']]" />
 ```
 
-Available items: `file`, `undo`, `redo`, `heading`, `fontFamily`, `fontSize`, `bold`, `italic`, `underline`, `strike`, `code`, `superscript`, `subscript`, `color`, `highlight`, `clearFormatting`, `align`, `lineHeight`, `indent`, `outdent`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `codeBlock`, `horizontalRule`, `link`, `image`, `table`, `specialChars`, `findReplace`, `pastePlain`, `print`, `fullscreen`, `ai` and `chat` (shown only when the `ai` prop is set).
+Available items: `file` (downloads .docx), `undo`, `redo`, `heading`, `fontFamily`, `fontSize`, `bold`, `italic`, `underline`, `strike`, `code`, `superscript`, `subscript`, `color`, `highlight`, `clearFormatting`, `align`, `lineHeight`, `indent`, `outdent`, `bulletList`, `orderedList`, `taskList`, `blockquote`, `codeBlock`, `horizontalRule`, `pageBreak`, `link`, `image`, `table`, `specialChars`, `findReplace`, `pastePlain`, `print`, `fullscreen`, `ai` and `chat` (shown only when the `ai` prop is set).
 
 When the toolbar doesn't fit, groups that don't fit move into a **More (⋯)** menu.
 
@@ -227,8 +251,8 @@ const ai = createHttpAiAdapter({ url: '/api/ai/complete' })
 |---|---|---|
 | **Ask AI** about selected text, or pick a quick action (improve, fix grammar, shorter, longer, formal, casual, simplify, summarize, list, table, translate) | Menu below the selection · Ctrl+J · AI menu | The selection plus about 2,000 characters around it |
 | **Generate content** | AI menu · Ctrl+J with nothing selected | The prompt; in an empty document it fills the page, otherwise it inserts after the current block |
-| **Continue writing** | AI menu | The text around the cursor |
-| **Edit whole document** | AI menu | All blocks with ids; the model returns **only the changed blocks** |
+| **Continue writing** | `api.aiContinue()` (not in the AI menu) | The text around the cursor |
+| **Edit whole document** | `api.aiEditDocument(instruction)` (not in the AI menu) | All blocks with ids; the model returns **only the changed blocks** |
 | Review | In the document: **Accept** / **Reject** on each suggestion; the AI bar: **Accept all**, **Reject all**, **Try again**, or type a follow-up to refine | – |
 | **Version history** | AI menu | A snapshot is saved before every accepted AI change; **Restore** brings it back |
 

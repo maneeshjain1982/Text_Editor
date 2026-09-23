@@ -1,24 +1,25 @@
 /**
- * Reference backend for the Rich Editor AI Canvas, calling Google Gemini.
+ * Reference backend for the Rich Editor AI Canvas. The provider (Gemini, ChatGPT/OpenAI
+ * or Samsung Gauss) is chosen in ai.config.ts.
  *
  *   POST {basePath}/complete  body: AiRequest (JSON)  →  NDJSON stream:
  *        {"type":"chunk","text":"…"}  …  {"type":"done"}   or   {"type":"error","message":"…"}
  *   GET  {basePath}/health    →  {"ok":true,"model":"…","mock":false}
  *
- * Run: `npm start` (uses .env) or `npm run mock` (no Gemini calls; deterministic demo output).
+ * Run: `npm start` (uses .env) or `npm run mock` (no provider calls; deterministic demo output).
  * Requires Node 22.18+ (runs TypeScript directly).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import { buildPrompt, createDemoAiAdapter, type AiRequest, type AiTask } from '@local/rich-editor/ai'
-import config from './gemini.config.ts'
-import { createGeminiClient, settingsFor, streamCompletion, UserFacingError } from './gemini.ts'
+import config from './ai.config.ts'
+import { createProvider, UserFacingError } from './providers/index.ts'
 
-const MOCK = process.argv.includes('--mock') || process.env.GEMINI_MOCK === '1'
+const MOCK = process.argv.includes('--mock') || process.env.AI_MOCK === '1'
 const PORT = Number(process.env.PORT) || config.server.port
 const TASKS = new Set<AiTask>(['generate', 'edit-selection', 'continue', 'edit-document', 'chat'])
 
-const client = MOCK ? null : createGeminiClient(config)
+const provider = MOCK ? null : createProvider(config)
 const demo = createDemoAiAdapter({ delayMs: 10 })
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,7 @@ const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return end(res, 204)
 
   if (req.method === 'GET' && url.pathname === `${config.server.basePath}/health`) {
-    return json(res, 200, { ok: true, mock: MOCK, provider: config.provider, model: config.model })
+    return json(res, 200, { ok: true, mock: MOCK, provider: config.provider, model: MOCK ? 'mock' : provider!.modelFor('generate') })
   }
   if (req.method !== 'POST' || url.pathname !== `${config.server.basePath}/complete`) {
     return json(res, 404, { error: 'Not found' })
@@ -69,13 +70,13 @@ const server = createServer(async (req, res) => {
   try {
     const stats = MOCK
       ? await mockCompletion(request, signal, (text) => send({ type: 'chunk', text }))
-      : await streamCompletion(client!, config, request.task, prompt, signal, (text) => send({ type: 'chunk', text }))
+      : await provider!.stream(request.task, prompt, signal, (text) => send({ type: 'chunk', text }))
     send({ type: 'done' })
     log(request, { ...stats, ms: Date.now() - started })
     if (config.logging.content) console.log('[ai] prompt:', prompt, '\n[ai] instruction:', request.instruction)
   } catch (error) {
     if (abort.signal.aborted) {
-      log(request, { model: settingsFor(config, request.task).model, cancelled: true, ms: Date.now() - started })
+      log(request, { model: MOCK ? 'mock' : provider!.modelFor(request.task), cancelled: true, ms: Date.now() - started })
     } else {
       const timedOut = signal.aborted
       const message = timedOut
@@ -208,6 +209,6 @@ function log(request: AiRequest, stats: Record<string, unknown>) {
 }
 
 server.listen(PORT, () => {
-  const mode = MOCK ? 'MOCK mode (no Gemini calls)' : `${config.provider} · ${config.model}`
+  const mode = MOCK ? 'MOCK mode (no provider calls)' : `${config.provider} · ${provider!.modelFor('generate')}`
   console.log(`[ai] Rich Editor AI server on http://localhost:${PORT}${config.server.basePath} - ${mode}`)
 })

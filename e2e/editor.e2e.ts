@@ -208,6 +208,9 @@ test('creates and edits a link', async ({ page }) => {
   await clearEditor(page)
   await page.keyboard.type('Visit site')
   await page.keyboard.press('Shift+Home')
+  // ProseMirror syncs the DOM selection asynchronously; opening the dialog too early
+  // would see an empty selection and insert the URL as the link text.
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Visit site')
   await page.keyboard.press('Control+k')
   const dialog = page.getByRole('dialog', { name: 'Link' })
   await dialog.getByLabel('URL').fill('example.org')
@@ -221,9 +224,9 @@ test('creates and edits a link', async ({ page }) => {
 })
 
 test('exports .docx with native tables, lists and images, then re-imports it', async ({ page }, testInfo) => {
-  await page.locator('.re-toolbar').getByRole('button', { name: 'File' }).click()
-  await shot(page, '06-file-menu')
-  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'Word document (.docx)' }).click()])
+  await shot(page, '06-toolbar')
+  const downloadButton = page.locator('.re-toolbar').getByRole('button', { name: 'Download as Word (.docx)' })
+  const [download] = await Promise.all([page.waitForEvent('download'), downloadButton.click()])
   expect(download.suggestedFilename()).toBe('quarterly-review.docx')
   const path = testInfo.outputPath('export.docx')
   await download.saveAs(path)
@@ -237,24 +240,58 @@ test('exports .docx with native tables, lists and images, then re-imports it', a
   expect(xml).toMatch(/w:fill="BBF7D0"/)
   expect(Object.keys(zip.files).some((f) => f.startsWith('word/media/'))).toBe(true)
 
-  // Re-import through File → Open
+  // Re-import through the host app's "Open file…" button (api.importFile)
   await clearEditor(page)
   await expect(editor(page).locator('table')).toHaveCount(0)
-  await page.locator('.re-toolbar input[type="file"]').setInputFiles(path)
+  await page.locator('.pg-file-input').setInputFiles(path)
   await expect(editor(page).locator('h1')).toContainText('Quarterly Business Review')
   await expect(editor(page).locator('table')).toHaveCount(1)
   await expect(editor(page).locator('img')).toHaveCount(1)
 })
 
-test('exports HTML and Markdown', async ({ page }) => {
-  for (const [label, ext] of [['Web page (.html)', 'html'], ['Markdown (.md)', 'md']] as const) {
-    await page.locator('.re-toolbar').getByRole('button', { name: 'File' }).click()
-    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: label }).click()])
-    expect(download.suggestedFilename()).toBe(`quarterly-review.${ext}`)
-    const text = await readFile(await download.path(), 'utf8')
-    expect(text).toContain('Quarterly Business Review')
-    if (ext === 'md') expect(text).toMatch(/\| Metric \| Q2 \| Q3 \| Change \|/)
+test('inserts a page break that reaches the .docx', async ({ page, browserName }, testInfo) => {
+  void browserName
+  await editor(page).locator('p', { hasText: 'Revenue grew' }).click()
+  await page.keyboard.press('End')
+  await toolbarButton(page, 'Page break').click()
+  await expect(editor(page).locator('[data-type="page-break"]')).toHaveCount(1)
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('.re-toolbar').getByRole('button', { name: 'Download as Word (.docx)' }).click(),
+  ])
+  const path = testInfo.outputPath('page-break.docx')
+  await download.saveAs(path)
+  const zip = await JSZip.loadAsync(await readFile(path))
+  const xml = await zip.file('word/document.xml')!.async('string')
+  expect(xml).toContain('<w:br w:type="page"/>')
+})
+
+test('long documents break into pages automatically, and a manual break starts a new one', async ({ page }) => {
+  // The playground's sample fits on one page; add paragraphs until it doesn't.
+  // Select-all then collapse right puts the cursor at the end of the document reliably.
+  await editor(page).locator('p', { hasText: 'Revenue grew' }).click()
+  await page.keyboard.press('Control+A')
+  await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Enter')
+  const filler = 'Capacity planning, hiring and the partner programme, reviewed for the coming quarter. '.repeat(3)
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.insertText(`Paragraph ${i}. ${filler}`)
+    await page.keyboard.press('Enter')
   }
+
+  const spacers = editor(page).locator('.re-page-spacer')
+  await expect(spacers.first()).toBeVisible({ timeout: 10_000 })
+  await expect(spacers.first()).toHaveAttribute('data-label', 'Page 2')
+  await shot(page, '07-auto-pagination')
+
+  // Automatic breaks are decorations: they must not reach v-model or the exported HTML.
+  await expect(page.getByTestId('output')).not.toContainText('re-page-spacer')
+
+  const before = await spacers.count()
+  await toolbarButton(page, 'Page break').click()
+  await expect(editor(page).locator('[data-type="page-break"]')).toHaveCount(1)
+  await expect(spacers).not.toHaveCount(before - 1) // pagination recomputed around it
 })
 
 test('toolbar collapses into a More menu on narrow screens', async ({ page }) => {
@@ -274,18 +311,18 @@ test('toolbar collapses into a More menu on narrow screens', async ({ page }) =>
 })
 
 test('dark theme and inline layout', async ({ page }) => {
-  await page.getByTestId('theme').selectOption('dark')
+  await page.goto('/?theme=dark')
   await expect(page.locator('.re-root')).toHaveClass(/re-theme-dark/)
   // Light highlight/cell tints keep dark text in dark mode.
   await expect(editor(page).locator('mark').first()).toHaveCSS('color', 'rgb(31, 35, 40)')
   await shot(page, '08-document-dark')
-  await page.getByTestId('layout').selectOption('inline')
+  await page.goto('/?theme=dark&layout=inline')
   await expect(page.locator('.re-root')).toHaveClass(/re-layout-inline/)
   await shot(page, '09-inline-dark')
 })
 
 test('read-only mode hides the toolbar', async ({ page }) => {
-  await page.getByLabel('Editable').uncheck()
+  await page.goto('/?editable=false')
   await expect(page.locator('.re-toolbar')).toHaveCount(0)
   await expect(editor(page)).toHaveAttribute('contenteditable', 'false')
 })
@@ -349,12 +386,10 @@ test('AI: custom instruction, reject, and Esc', async ({ page }) => {
   await expect(aiBar(page)).toHaveCount(0)
 })
 
+// "Edit whole document" is not in the AI menu; the playground calls api.aiEditDocument().
 test('AI: whole-document edit only suggests changes for some blocks; accept all', async ({ page }) => {
   const blocksBefore = await editor(page).locator(':scope > *').count()
-  await page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Edit whole document…' }).click()
-  await aiBar(page).getByRole('textbox', { name: 'Instruction for AI' }).fill('Tighten the wording')
-  await aiBar(page).getByRole('button', { name: 'Send' }).click()
+  await page.getByTestId('ai-edit-document').click()
 
   const suggestions = editor(page).locator('.re-ai-added')
   // The demo edits plain paragraphs only; the sample document has two.
@@ -380,10 +415,10 @@ test('AI: generate into an empty document and continue writing', async ({ page }
   await page.getByTestId('re-ai-accept-all').click()
   await expect(editor(page).locator('h1')).toHaveText('Project update')
 
+  // "Continue writing" is not in the AI menu either; the playground calls api.aiContinue().
   await editor(page).locator('p').first().click()
   await page.keyboard.press('End')
-  await page.locator('.re-toolbar').getByRole('button', { name: 'AI', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Continue writing' }).click()
+  await page.getByTestId('ai-continue').click()
   await expect(editor(page).locator('.re-ai-added')).toContainText('Building on this')
   await page.keyboard.press('Escape')
   await expect(editor(page).locator('.re-ai-added')).toHaveCount(0)

@@ -14,6 +14,8 @@ import { SearchReplace } from './SearchReplace'
 import { Image, type ImageOptions } from './Image'
 import { ColoredTableCell, ColoredTableHeader } from './Table'
 import { PasteCleanup } from './PasteCleanup'
+import { PageBreak } from './PageBreak'
+import { AutoPagination } from './AutoPagination'
 import { lowlight } from './lowlight'
 import { AiSuggestionExtension, type AiSuggestionOptions } from './AiSuggestion'
 import type { EditorFeatures } from '../types'
@@ -24,10 +26,14 @@ export interface BuildExtensionsOptions {
   image: ImageOptions
   /** AI suggestion callbacks. The extension is always registered (it is inert without suggestions). */
   ai?: Partial<AiSuggestionOptions>
+  /** Label shown on page-break lines. */
+  pageBreakLabel?: string
+  /** Show where pages end while typing (page layout only). `label` may contain `{page}`. */
+  autoPagination?: { enabled: boolean; label?: string }
   extra?: Extensions
 }
 
-export function buildExtensions({ placeholder, features, image, ai, extra = [] }: BuildExtensionsOptions): Extensions {
+export function buildExtensions({ placeholder, features, image, ai, pageBreakLabel, autoPagination, extra = [] }: BuildExtensionsOptions): Extensions {
   const extensions: Extensions = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -52,6 +58,11 @@ export function buildExtensions({ placeholder, features, image, ai, extra = [] }
     BlockAttributes,
     SearchReplace,
     PasteCleanup,
+    PageBreak.configure(pageBreakLabel ? { label: pageBreakLabel } : {}),
+    AutoPagination.configure({
+      enabled: autoPagination?.enabled ?? false,
+      ...(autoPagination?.label ? { label: autoPagination.label } : {}),
+    }),
     AiSuggestionExtension.configure(ai ?? {}),
   ]
 
@@ -72,4 +83,6 @@ export function buildExtensions({ placeholder, features, image, ai, extra = [] }
 
 export { findMatches } from './SearchReplace'
 export { cleanPastedHTML } from './PasteCleanup'
+export { PageBreak, PAGE_BREAK_HTML, PAGE_BREAK_MARKER } from './PageBreak'
+export { AutoPagination, autoPaginationKey } from './AutoPagination'
 export { AiSuggestionExtension, getAiSuggestionState, aiSuggestionKey, type AiSuggestion } from './AiSuggestion'

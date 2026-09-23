@@ -87,6 +87,36 @@ test('follow-up keeps context; insert an answer; clear and close', async ({ page
   await expect(chatPanel(page)).toHaveCount(0)
 })
 
+test('the chat can float, be dragged, and dock again', async ({ page }) => {
+  await toolbarButton(page, 'Chat with document').click()
+  const panel = chatPanel(page)
+  await expect(panel).not.toHaveClass(/re-chat-floating/)
+
+  await panel.getByRole('button', { name: 'Float this panel' }).click()
+  await expect(panel).toHaveClass(/re-chat-floating/)
+  const before = (await panel.boundingBox())!
+
+  // Drag it by the header to the top left of the editor.
+  const header = panel.locator('.re-chat-header')
+  const grip = (await header.boundingBox())!
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x - 260, grip.y - 160, { steps: 10 })
+  await page.mouse.up()
+
+  const after = (await panel.boundingBox())!
+  expect(after.x).toBeLessThan(before.x - 100)
+  expect(after.y).toBeLessThan(before.y)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/13-chat-floating.png` })
+
+  // It still works where it is, and docking restores the side panel.
+  await chatInput(page).fill('What does it say about churn?')
+  await chatInput(page).press('Enter')
+  await expect(panel.locator('.re-chat-assistant')).toContainText('Churn fell to 2.1%')
+  await panel.getByRole('button', { name: 'Dock this panel' }).click()
+  await expect(panel).not.toHaveClass(/re-chat-floating/)
+})
+
 test('selected text is attached to the question', async ({ page }) => {
   await editor(page).locator('p', { hasText: 'Revenue grew' }).click({ clickCount: 3 })
   await toolbarButton(page, 'Chat with document').click()

@@ -34,7 +34,8 @@ export async function importFile(file: File): Promise<ImportResult> {
     case 'md':
     case 'markdown': {
       const { marked } = await import('marked')
-      return { html: await marked.parse(await file.text(), { gfm: true }) }
+      const { markdownPageBreaksToHtml } = await import('./exporters')
+      return { html: await marked.parse(markdownPageBreaksToHtml(await file.text()), { gfm: true }) }
     }
     case 'json': {
       const json = JSON.parse(await file.text())

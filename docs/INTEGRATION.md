@@ -14,7 +14,7 @@ For the complete list of props, events and methods, see the [API reference](../p
 6. [Image uploads](#6-image-uploads)
 7. [Match your dashboard's design](#7-match-your-dashboards-design)
 8. [Word export and import](#8-word-export-and-import)
-9. [AI Canvas with Gemini](#9-ai-canvas-with-gemini)
+9. [AI Canvas (Gemini, ChatGPT or Gauss)](#9-ai-canvas-gemini-chatgpt-or-gauss)
 10. [Common scenarios](#10-common-scenarios)
 11. [Security](#11-security)
 12. [Updating the package](#12-updating-the-package)
@@ -484,7 +484,7 @@ const messagesKo: Partial<Messages> = {
 
 ### 8.1 In the browser
 
-The **File** menu in the toolbar already offers **Open** and **Download as Word**. To trigger them from your own buttons:
+The toolbar has one file button, **Download as Word (.docx)**. Opening files and the other formats are host actions, so add your own buttons for them:
 
 ```vue
 <script setup lang="ts">
@@ -514,6 +514,8 @@ function openWordFile(e: Event) {
 
 `page-size` (`A4` or `Letter`) applies to the on-screen page, printing and the Word file.
 
+**Page view.** With `layout="document"` the editor also shows where pages end, like Word: a block that would cross the bottom of a page is pushed onto the next one, and the gap is labelled with the page number. Those gaps are editor decorations, so they never appear in `v-model`, the HTML/Markdown exports or the .docx — Word repaginates the file itself. Turn them off with `:auto-page-breaks="false"` (for example on very long documents, where the measuring costs a few milliseconds per edit). A block taller than one page, such as a long table, still runs across the gap; Word splits it on export. Users force a break with **Ctrl+Enter** or the toolbar button, which exports as a real Word page break.
+
 ### 8.2 Without the component (for example, a "Download" button in a list view)
 
 ```ts
@@ -537,7 +539,7 @@ async function downloadFromList(documentId: string) {
 - **Images:** store images on a CORS-enabled host (see [section 6](#6-image-uploads)) so export can embed them.
 - **Imported files:** importing .docx keeps structure, lists, tables, images, links and bold/italic/underline, but not font colors or sizes.
 
-## 9. AI Canvas with Gemini
+## 9. AI Canvas (Gemini, ChatGPT or Gauss)
 
 The AI Canvas lets users generate a draft, then change only the part they point at, instead of regenerating everything. Every AI change appears as a suggestion to accept or reject. See [AI Canvas in the API reference](../packages/editor/README.md#ai-canvas) for the full feature list.
 
@@ -550,13 +552,13 @@ RichEditor ──(createHttpAiAdapter)──▶ /api/ai/complete on your domain
                                           │ reverse proxy / API gateway
                                           ▼
                               AI server (examples/ai-server)
-                              gemini.config.ts + GEMINI_API_KEY
+                              ai.config.ts + <PROVIDER>_API_KEY
                                           │
                                           ▼
-                                    Google Gemini
+                     Google Gemini · ChatGPT (OpenAI) · Samsung Gauss
 ```
 
-**The Gemini API key must never reach the browser.** The editor only talks to your backend, and your backend calls Gemini.
+**The provider API key must never reach the browser.** The editor only talks to your backend, and your backend calls the LLM.
 
 ### 9.2 Set up the server
 
@@ -565,13 +567,21 @@ Use the reference server in [`examples/ai-server`](../examples/ai-server/README.
 ```bash
 cd examples/ai-server
 npm install
-cp .env.example .env        # then set GEMINI_API_KEY (from https://aistudio.google.com/apikey)
+cp .env.example .env        # then set the key for your provider
 npm start                   # http://localhost:8787/api/ai
 ```
 
-Models, thinking levels, limits, safety and house style are all set in **one file**, [`gemini.config.ts`](../examples/ai-server/gemini.config.ts). The default model is `gemini-3.8-flash`, with `gemini-3.5-flash-lite` as a fallback. For Google Cloud, set `provider: 'vertex-ai'` and `GOOGLE_CLOUD_PROJECT`.
+**Choosing the LLM.** Provider, models, thinking levels, limits, safety and house style are all set in **one file**, [`ai.config.ts`](../examples/ai-server/ai.config.ts):
 
-`npm run mock` runs the same server without calling Gemini, which is useful for front-end development and CI.
+| `provider` | Service | Key | Notes |
+|---|---|---|---|
+| `'gemini'` (default) | Google Gemini | `GEMINI_API_KEY` | `gemini-3.8-flash`, falling back to `gemini-3.5-flash-lite`. For Google Cloud set `gemini.mode: 'vertex-ai'` and `GOOGLE_CLOUD_PROJECT`. |
+| `'openai'` | ChatGPT / OpenAI | `OPENAI_API_KEY` | Any OpenAI-compatible gateway works: change `openai.baseUrl`. |
+| `'gauss'` | Samsung Gauss | `GAUSS_API_KEY` | Set `GAUSS_BASE_URL` and `GAUSS_MODEL`. Assumes an OpenAI-compatible endpoint; if yours differs, adapt `providers/openai.ts`. |
+
+Switching provider changes nothing in the front end: the editor always talks to `/api/ai/complete`.
+
+`npm run mock` runs the same server without calling any provider, which is useful for front-end development and CI.
 
 ### 9.3 Route `/api/ai` to the server
 
@@ -654,7 +664,9 @@ chatHistory.value = doc.chatHistory ?? []
 watch(chatHistory, (h) => api.put(`/documents/${id}/chat`, h))
 ```
 
-Each question sends the **whole document** (up to about 150,000 characters), so check that this fits your data policy. Set `tasks.chat` in `gemini.config.ts` to change the model settings for chat.
+Each question sends the **whole document** (up to about 150,000 characters), so check that this fits your data policy. Set `tasks.chat` in `ai.config.ts` to change the model settings for chat.
+
+The chat is docked beside the page by default. Pass `chat-mode="floating"` for a window the user can drag anywhere inside the editor and resize; either way the user can switch with the button in the chat header.
 
 ### 9.7 Another backend or model
 

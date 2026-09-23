@@ -56,6 +56,8 @@ const props = withDefaults(defineProps<RichEditorProps>(), {
   maxVersions: 30,
   chatHistory: undefined,
   chatStarters: undefined,
+  chatMode: 'panel',
+  autoPageBreaks: true,
 })
 
 const emit = defineEmits<{
@@ -128,6 +130,9 @@ const editor = useEditor({
   extensions: buildExtensions({
     placeholder: () => props.placeholder,
     features: features.value,
+    pageBreakLabel: translate('pageBreak'),
+    // The label keeps its `{page}` placeholder; the extension fills in the number.
+    autoPagination: { enabled: props.autoPageBreaks && props.layout === 'document', label: translate('pageLabel') },
     image: {
       uploadImage: props.uploadImage,
       maxImageSize: props.maxImageSize,
@@ -282,6 +287,10 @@ const chatInstance = createChatController({
   onClear: () => emit('update:chatHistory', []),
 })
 const chatController = computed(() => (features.value.chat ? chatInstance : null))
+// Docked or a draggable window; the user can switch from the chat header.
+const chatFloating = ref(props.chatMode === 'floating')
+watch(() => props.chatMode, (mode) => (chatFloating.value = mode === 'floating'))
+
 const chatStarters = computed(
   () =>
     props.chatStarters ??
@@ -299,6 +308,9 @@ function openAi() {
 async function runAi(mode: 'generate' | 'edit-selection' | 'continue' | 'edit-document', instruction: string, label?: string) {
   const ai = aiController.value
   if (!ai || !ai.open(mode)) return
+  // These run from the host's own buttons, so give the editor focus back: the
+  // suggestion shortcuts (Esc to reject, Ctrl+Z after accepting) work straight away.
+  editor.value?.commands.focus()
   await ai.run(instruction, label, mode)
 }
 
@@ -562,7 +574,13 @@ defineExpose(api)
           <TiptapContent :editor="editor" class="re-editor-content" />
         </div>
       </div>
-      <ChatPanel v-if="editor && chatController && chatController.open.value" :chat="chatController" :starters="chatStarters" />
+      <ChatPanel
+        v-if="editor && chatController && chatController.open.value"
+        :chat="chatController"
+        :starters="chatStarters"
+        :floating="chatFloating"
+        @update:floating="chatFloating = $event"
+      />
     </div>
 
     <StatusBar v-if="features.statusBar" :saved="savedFlag" :page-size="pageSize" :layout="layout" />

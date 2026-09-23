@@ -354,6 +354,67 @@
   background: transparent;
 }
 
+/* Page break in page view: draw the gap between sheets */
+.re-layout-document .re-content [data-type='page-break'] {
+  margin: 0 calc(-1 * var(--re-page-padding));
+  padding: 0;
+  height: 28px;
+  border: 0;
+  border-top: 1px solid var(--re-border);
+  border-bottom: 1px solid var(--re-border);
+  background: var(--re-canvas);
+}
+
+.re-layout-document .re-content [data-type='page-break']::after {
+  top: 6px;
+  right: var(--re-page-padding);
+  background: transparent;
+}
+
+.re-content [data-type='page-break'].ProseMirror-selectednode {
+  outline: 2px solid var(--re-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * Automatic page breaks (extensions/AutoPagination.ts): a decoration filling the rest of a
+ * page so the next block starts on a new one. Never part of the document, so it is not
+ * exported and never printed (the printer paginates by itself).
+ */
+.re-page-spacer {
+  position: relative;
+  margin: 0 calc(-1 * var(--re-page-padding));
+  background: linear-gradient(to bottom, transparent, transparent calc(100% - 28px), var(--re-canvas) calc(100% - 28px));
+  border-bottom: 1px solid var(--re-border);
+  user-select: none;
+  pointer-events: none;
+}
+
+.re-page-spacer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  border-top: 1px solid var(--re-border);
+}
+
+.re-page-spacer::after {
+  content: attr(data-label);
+  position: absolute;
+  right: var(--re-page-padding);
+  bottom: 6px;
+  font-family: var(--re-ui-font, sans-serif);
+  font-size: 11px;
+  color: var(--re-muted);
+}
+
+@media print {
+  .re-page-spacer {
+    display: none;
+  }
+}
+
 /* Search matches */
 .re-content .re-search-match {
   background: var(--re-match);
@@ -1475,6 +1536,35 @@
   border-left: 1px solid var(--re-border);
   background: var(--re-bg);
   color: var(--re-text);
+}
+
+/* Floating chat: a window the user can drag anywhere inside the editor, and resize. */
+.re-chat.re-chat-floating {
+  position: absolute;
+  right: 20px;
+  bottom: 56px;
+  z-index: 40;
+  width: 380px;
+  height: min(520px, 70%);
+  min-width: 280px;
+  min-height: 220px;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius, 8px);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+  resize: both;
+}
+
+.re-chat-drag {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.re-chat-drag:active {
+  cursor: grabbing;
 }
 
 .re-chat-header {

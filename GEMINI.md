@@ -51,7 +51,7 @@ Editor/                                  npm workspaces root: packages/*, apps/*
 ├─ e2e/editor.e2e.ts                     Playwright tests against the playground (root playwright.config.ts)
 └─ examples/                             NOT in the workspace, on purpose (they consume the real .tgz)
    ├─ README.md
-   ├─ ai-server/                         Gemini backend: gemini.config.ts (THE config), server.ts, gemini.ts, mock mode
+   ├─ ai-server/                         AI backend: ai.config.ts (THE config), providers/ (gemini, openai/gauss), server.ts, mock mode
    ├─ sample-app/                        "Docs Hub" Vue 3 + Vue Router app; installs the editor from the .tgz
    │  └─ README.md                       how to run it + a 12-step integration walkthrough (step 12: AI)
    └─ sample-app-tests/                  separate Playwright project: package checks + browser tests of the app's production build
@@ -137,8 +137,12 @@ Editor/                                  npm workspaces root: packages/*, apps/*
 - **R6 · Toolbar buttons must not steal focus.** Buttons use `@mousedown.prevent`, and commands run `editor.chain().focus()…`.
 - **R7 · Accessibility.** The toolbar uses `role="toolbar"` with arrow-key navigation, icon buttons have `aria-label`s, menus use `role="menu"`/`menuitem`, and dialogs trap focus and restore it when closed.
 - **R8 · Visible text goes through `t()`.** Add new strings to `defaultMessages` in `i18n/messages.ts`.
+- **R15 · Page gaps are decorations, never nodes.** `extensions/AutoPagination.ts` measures the rendered blocks and inserts widget spacers; nothing it does may reach the document, `v-model`, exports or the undo history (it dispatches with `addToHistory: false`). Word and the printer paginate by themselves, so the spacers are hidden in print and absent from the .docx.
 - **R9 · AI never edits the document directly.** Model output becomes suggestions in plugin state. `v-model`, autosave and exports must only ever contain accepted content, and accepting is one undo step.
-- **R10 · The API key stays on the server.** The package only calls the host's adapter. Don't add provider SDKs to the package.
+- **R10 · The API key stays on the server.** The package only calls the host's adapter. Don't add provider SDKs to the package. The provider (Gemini / ChatGPT / Gauss) is a server concern: `examples/ai-server/ai.config.ts` plus one file in `providers/`.
+- **R13 · The package must stand alone.** `packages/editor/src` may only import its own files and declared dependencies; `test/package.spec.ts` fails otherwise.
+- **R14a · The AI menu holds Ask AI, Generate, Chat and Versions only.** Continue writing and whole-document edits stay in the API (`api.aiContinue()`, `api.aiEditDocument()`) for hosts to wire up, as the playground does; the controller, prompts and server tasks still support them.
+- **R14 · The toolbar's `file` item downloads .docx and nothing else.** New document, opening files and the other export formats stay host actions (`api.newDocument()`, `api.importFile()`, `api.download()`), shown by the playground's "Open file…" button.
 - **R12 · Model output is never inserted as raw HTML.** Chat answers are rendered via `markdownToFragment` → `DOMSerializer`, the same schema filter as suggestions.
 - **R11 · Prompts are built on the server in production** (`trustClientPrompt: false`). If you change `ai/prompts.ts`, rebuild and repack, and run `npm run editor:update` in `examples/ai-server`, so the server uses the same prompts.
 
@@ -174,6 +178,11 @@ Editor/                                  npm workspaces root: packages/*, apps/*
 | P25 | Toolbar width again: adding the Chat button pushed Insert into "More". | Toolbar group gap is 1px, and the heading and font selects are 100px wide. Re-measure at 1440px when adding buttons. |
 | P26 | Tests that type a follow-up while an answer is still streaming: the chat ignores sending while busy (by design). | Wait for the answer's **Copy** button (status done) before the next question. |
 | P27 | The PowerShell tool blocks a whole command that contains `Remove-Item` together with a `//` string (e.g. JS comments in a here-string). | Keep deletions in a separate command, and write files with the file tools. |
+| P28 | A parse rule for `p[style]` with a page-break style swallows the paragraph's text, and the paragraph rule wins at equal priority. | `PageBreak` matches only **empty** styled elements, and sets `priority: 60`. |
+| P29 | An empty `<div>` is "blank" to turndown, which drops it before custom rules run, so page breaks disappeared from Markdown. | `toMarkdown` gives page-break divs placeholder text first; the `pageBreak` rule turns it into `<!-- pagebreak -->`. |
+| P32 | Automatic pagination measures blocks *with the previous spacers still in the DOM*. Subtract their heights (`rendered`) or the gaps compound every frame. | `measure()` in `AutoPagination.ts`; it also bails when the DOM children and the doc's top-level nodes disagree. |
+| P31 | `--re-page-height` is `297mm`, and a custom property's computed value keeps its unit, so `parseFloat` gave a 297**px** page and pagination silently did nothing. | Measure the page with a probe element whose height is `var(--re-page-height)`. |
+| P30 | The playground no longer has Layout/Theme/Toolbar controls; those props come from the URL (`?theme=dark&layout=inline&page=Letter&editable=false`), which the e2e tests use. | Don't reintroduce demo chrome; add a query parameter instead. |
 | P18 | The sample app's lockfile pins the tarball's checksum, so a plain `npm install` after repacking can fail with `EINTEGRITY`. | Use `npm run editor:update` in `examples/sample-app`. |
 
 ---
@@ -194,7 +203,7 @@ Run from the repository root unless a directory is shown. Node 20.19+ or 22.12+ 
 | Sample app | `cd examples/sample-app && npm run dev` → http://localhost:5174 |
 | Update the sample app's copy of the editor | `cd examples/sample-app && npm run editor:update` |
 | Full package validation (9 checks + 11 browser tests, AI server in mock mode) | `cd examples/sample-app-tests && npm run validate` |
-| Gemini server | `cd examples/ai-server && npm start` (needs `.env` with `GEMINI_API_KEY`) · `npm run mock` (no key) |
+| AI server | `cd examples/ai-server && npm start` (needs `.env` with the key for the provider in `ai.config.ts`) · `npm run mock` (no key) |
 
 **Definition of done for any editor change:** `npm run typecheck`, the unit tests, `npx playwright test`, **and** `npm run validate` in `examples/sample-app-tests` all pass. Stop any dev or preview server on port 4173 before `validate`, because Playwright reuses an existing server.
 
@@ -249,9 +258,9 @@ At the last update, every suite passes: 66 unit, 22 playground E2E, 20 sample-ap
 ### Change AI behavior
 
 - **Prompts:** `ai/prompts.ts` (applies to the editor and the server). Update the unit tests in `test/ai.spec.ts`, then repack and run `editor:update` in `examples/ai-server`.
-- **Model and generation settings:** `examples/ai-server/gemini.config.ts` only.
+- **Provider, model and generation settings:** `examples/ai-server/ai.config.ts` only (`provider: 'gemini' | 'openai' | 'gauss'`). Provider implementations live in `examples/ai-server/providers/`.
 - **New quick action:** add it to `ai/actions.ts`, with its label key in `i18n/messages.ts`.
-- **Chat behavior:** the prompt is the `chat` case in `ai/prompts.ts`; limits (document size, turns) are in `AI_LIMITS`; server settings are `tasks.chat` and `limits.maxChatTurns` in `gemini.config.ts`.
+- **Chat behavior:** the prompt is the `chat` case in `ai/prompts.ts`; limits (document size, turns) are in `AI_LIMITS`; server settings are `tasks.chat` and `limits.maxChatTurns` in `ai.config.ts`.
 - **New AI task:** add it to the `AiTask` type, `buildPrompt`, `responseFormatFor`, the controller's `captureRange`/`run`, the server's `TASKS` set and `tasks` config, and the demo adapter.
 
 ### Release a version
@@ -267,7 +276,7 @@ At the last update, every suite passes: 66 unit, 22 playground E2E, 20 sample-ap
 
 **Not yet verified**
 
-- The AI Canvas has been tested end to end with the **mock** server and demo adapter only. A **live Gemini call** needs a real `GEMINI_API_KEY` (not available during development), so check one of each task against real Gemini before release.
+- The AI Canvas has been tested end to end with the **mock** server, the demo adapter and (for the OpenAI-compatible provider) a fake local SSE endpoint. No **live provider call** has been made - no real key was available - so check one of each task against the real service before release.
 - An exported `.docx` has **not been opened in Microsoft Word** by a person; only the XML is tested. Word automation hung on the development machine.
 - Host bundlers other than Vite (webpack 5 / Vue CLI 5) and **Nuxt** are untested; they are expected to work from the package format.
 
